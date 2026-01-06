@@ -1,0 +1,9 @@
+streamlit
+shapely
+requests
+pandas
+numpy
+metpy
+siphon
+matplotlib
+plyer
