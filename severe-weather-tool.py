@@ -89,14 +89,14 @@ def get_utc_now():
 
 def get_location():
     try:
-    resp = requests.get('https://ipinfo.io/json', timeout=5)
-    data = resp.json()
-    loc = data.get('loc', '').split(',')
-    if len(loc) == 2:
-        return float(loc[0]), float(loc[1])
-except:
-    pass
-return None, None
+        resp = requests.get('https://ipinfo.io/json', timeout=5)
+        data = resp.json()
+        loc = data.get('loc', '').split(',')
+        if len(loc) == 2:
+            return float(loc[0]), float(loc[1])
+    except:
+        pass
+    return None, None
 
 def get_spc_risk(lat, lon):
     url = "https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query"
