@@ -88,10 +88,15 @@ def get_utc_now():
     return datetime.datetime.now(datetime.timezone.utc)
 
 def get_location():
-    g = geocoder.ip('me')
-    if g.ok and g.latlng:
-        return g.latlng
-    return None, None
+    try:
+    resp = requests.get('https://ipinfo.io/json', timeout=5)
+    data = resp.json()
+    loc = data.get('loc', '').split(',')
+    if len(loc) == 2:
+        return float(loc[0]), float(loc[1])
+except:
+    pass
+return None, None
 
 def get_spc_risk(lat, lon):
     url = "https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query"
