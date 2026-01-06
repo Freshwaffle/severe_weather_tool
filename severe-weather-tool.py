@@ -3,7 +3,6 @@ import datetime
 import requests
 import pandas as pd
 import numpy as np
-import geocoder
 from shapely.geometry import shape, Point
 from siphon.simplewebservice.wyoming import WyomingUpperAir
 from metpy.units import units
