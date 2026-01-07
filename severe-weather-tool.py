@@ -448,27 +448,29 @@ if st.button("🚀 Run Analysis", type="primary"):
                 df_params.index.name = "Parameter"
                 df_params = df_params.reset_index()
 
-                def highlight_high(row):
-                    val = row['Value']
-                    param = row['Parameter']
+                # Fixed highlighting function — no row lookup
+                def highlight_high(val, param):
                     if pd.isna(val):
-                        return ['']
-                    color = ''
+                        return ''
                     if param in ["MLCAPE", "MUCAPE", "SBCAPE"] and val > 2000:
-                        color = 'background-color: #ff9999'
-                    elif param in ["SRH_1"] and val > 150:
-                        color = 'background-color: #ffcc99'
-                    elif param in ["SHEAR_6"] and val > 40:
-                        color = 'background-color: #ffeb99'
-                    elif param in ["STP"] and val > 1:
-                        color = 'background-color: #ff9999'
-                    elif param in ["SCP"] and val > 2:
-                        color = 'background-color: #ffcc99'
-                    elif param in ["SHIP"] and val > 1:
-                        color = 'background-color: #ffff99'
-                    return [color] * len(row)
+                        return 'background-color: #ff9999'
+                    if param == "SRH_1" and val > 150:
+                        return 'background-color: #ffcc99'
+                    if param == "SHEAR_6" and val > 40:
+                        return 'background-color: #ffeb99'
+                    if param == "STP" and val > 1:
+                        return 'background-color: #ff9999'
+                    if param == "SCP" and val > 2:
+                        return 'background-color: #ffcc99'
+                    if param == "SHIP" and val > 1:
+                        return 'background-color: #ffff99'
+                    if param == "DCAPE" and val > 1000:
+                        return 'background-color: #ffeb99'
+                    return ''
 
-                styled = df_params.style.apply(highlight_high, axis=1)
+                # Apply highlighting per cell using a lambda
+                styled = df_params.style.map(lambda val: highlight_high(val, df_params.loc[df_params['Value'] == val, 'Parameter'].iloc[0] if len(df_params[df_params['Value'] == val]) > 0 else ''))
+
                 st.dataframe(styled, use_container_width=True)
 
                 st.markdown("---")
