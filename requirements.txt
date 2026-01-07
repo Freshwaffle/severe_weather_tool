@@ -7,3 +7,6 @@ metpy
 siphon
 matplotlib
 plyer
+sounderpy
+streamlit-folium
+folium
