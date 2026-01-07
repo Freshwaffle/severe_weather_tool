@@ -219,7 +219,7 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
             return None, None, None
 
 # =========================
-# Analysis (with safe float conversion)
+# Analysis (fully safe)
 # =========================
 def analyze(df):
     p = df['pressure'].values * units.hPa
@@ -272,34 +272,28 @@ def analyze(df):
     except:
         shear_1_mag = shear_3_mag = shear_6_mag = np.nan
 
+    # Safe extraction for masked values
+    def safe_float(val):
+        if np.ma.is_masked(val):
+            return np.nan
+        try:
+            return float(val.magnitude if hasattr(val, 'magnitude') else val)
+        except:
+            return np.nan
+
     wind_speed = mpcalc.wind_speed(u, v).to('knots')
     wind_dir = mpcalc.wind_direction(u, v)
-    try:
-        sweat = float(mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir).magnitude)
-    except:
-        sweat = np.nan
 
-    k_index = float(mpcalc.k_index(p, T, Td).magnitude)
-    tt_index = float(mpcalc.total_totals_index(p, T, Td).magnitude)
-    showalter = float(mpcalc.showalter_index(p, T, Td).magnitude)
-    lifted_index = float(mpcalc.lifted_index(p, T, Td).magnitude)
+    sweat = safe_float(mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir))
+    k_index = safe_float(mpcalc.k_index(p, T, Td))
+    tt_index = safe_float(mpcalc.total_totals_index(p, T, Td))
+    showalter = safe_float(mpcalc.showalter_index(p, T, Td))
+    lifted_index = safe_float(mpcalc.lifted_index(p, T, Td))
 
-    try:
-        ehi = float(mpcalc.energy_helicity_index(mlcape, srh_3).magnitude)
-    except:
-        ehi = np.nan
-    try:
-        ship = float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500).magnitude)
-    except:
-        ship = np.nan
-    try:
-        stp = float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)).magnitude)
-    except:
-        stp = np.nan
-    try:
-        scp = float(mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff).magnitude)
-    except:
-        scp = np.nan
+    ehi = safe_float(mpcalc.energy_helicity_index(mlcape, srh_3))
+    ship = safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500))
+    stp = safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)))
+    scp = safe_float(mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff))
 
     return {
         "SBCAPE": float(sbcape.magnitude),
@@ -490,7 +484,7 @@ if st.button("🚀 Run Analysis", type="primary"):
                     return ''
 
                 styled = df_params.style.apply(lambda row: [get_color(row['Parameter'], row['Value']) if i == 1 else '' for i in range(len(row))], axis=1)
-                st.dataframe(styled, width='stretch')  # Updated: use 'stretch' instead of deprecated use_container_width
+                st.dataframe(styled, width='stretch')
 
                 st.markdown("---")
                 st.markdown("#### Parameter Interpretations")
