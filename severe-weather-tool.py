@@ -14,7 +14,7 @@ import plyer
 import sounderpy as spy
 
 # =========================
-# Stations (duplicate MHX removed)
+# Stations & Radars
 # =========================
 stations = {
     'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82), 'AFC': (61.27, -149.99),
@@ -219,7 +219,7 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
             return None, None, None
 
 # =========================
-# Full Analysis Function
+# Analysis & Plotting
 # =========================
 def analyze(df):
     p = df['pressure'].values * units.hPa
@@ -329,46 +329,33 @@ def plot_skewt(df, station):
     fig = plt.figure(figsize=(12, 12))
     skew = SkewT(fig, rotation=45)
 
-    # Plot temperature and dewpoint (these are quantities, MetPy handles them fine)
     skew.plot(df.pressure, df.temperature, 'r', linewidth=2, label='Temperature')
     skew.plot(df.pressure, df.dewpoint, 'g', linewidth=2, label='Dewpoint')
-
-    # Barbs expect magnitude in knots — MetPy will handle the units
     skew.plot_barbs(df.pressure, df.u_wind, df.v_wind)
 
     skew.ax.set_ylim(1050, 100)
     skew.ax.set_xlim(-50, 50)
-    skew.ax.legend()
+    skew.ax.legend(loc='upper left')
 
-    # Hodograph inset
     ax_hod = inset_axes(skew.ax, '40%', '40%', loc='upper right')
     h = Hodograph(ax_hod, component_range=80)
     h.add_grid(increment=20)
 
-    # Critical fix: Use .magnitude to get unitless values for plot_colormapped
-    u_mag = df.u_wind.magnitude
-    v_mag = df.v_wind.magnitude
-    speed = mpcalc.wind_speed(df.u_wind, df.v_wind).magnitude  # or just np.sqrt(u_mag**2 + v_mag**2)
+    try:
+        u_mag = df.u_wind.magnitude
+        v_mag = df.v_wind.magnitude
+        speed = mpcalc.wind_speed(df.u_wind, df.v_wind).magnitude
+    except AttributeError:
+        u_mag = df.u_wind.values
+        v_mag = df.v_wind.values
+        speed = np.sqrt(df.u_wind.values**2 + df.v_wind.values**2)
 
     h.plot_colormapped(u_mag, v_mag, speed)
 
-    plt.title(f"Skew-T & Hodograph — {station}")
+    plt.title(f"Skew-T Log-P & Hodograph — {station}")
     plt.tight_layout()
     plt.savefig('skewt_hodograph.png', dpi=150, bbox_inches='tight')
     plt.close()
-# =========================
-# Parameter Explanations
-# =========================
-param_explanations = {
-    "MLCAPE": "Mixed Layer CAPE — primary instability parameter",
-    "SRH_1": "0-1 km Storm Relative Helicity — low-level rotation potential",
-    "SHEAR_6": "0-6 km bulk shear — organization potential",
-    "DCAPE": "Downdraft CAPE — gust potential",
-    "STP": "Significant Tornado Parameter",
-    "SCP": "Supercell Composite Parameter",
-    "SHIP": "Significant Hail Parameter",
-    "EHI": "Energy Helicity Index",
-}
 
 # =========================
 # Streamlit App
@@ -410,7 +397,6 @@ if st.button("🚀 Run Analysis", type="primary"):
     else:
         st.success(f"Analyzing: {lat:.3f}°, {lon:.3f}°")
 
-        # Station logic
         station_code = None
         if sounding_type == "Observed":
             if selected_station == "Auto":
@@ -452,14 +438,89 @@ if st.button("🚀 Run Analysis", type="primary"):
                         pass
 
         with tab2:
+            st.subheader("🔍 Detailed Parameter Breakdown")
             if df is not None:
                 p = analyze(df)
-                df_params = pd.DataFrame.from_dict(p, orient='index', columns=['Value']).round(1)
-                for param, row in df_params.iterrows():
-                    with st.expander(f"{param}: {row['Value']}"):
-                        st.write(param_explanations.get(param, "Key severe weather parameter"))
+
+                st.markdown("#### All Calculated Parameters")
+                df_params = pd.DataFrame.from_dict(p, orient='index', columns=['Value'])
+                df_params = df_params.round(1)
+                df_params.index.name = "Parameter"
+                df_params = df_params.reset_index()
+
+                def highlight_high(row):
+                    val = row['Value']
+                    param = row['Parameter']
+                    if pd.isna(val):
+                        return ['']
+                    color = ''
+                    if param in ["MLCAPE", "MUCAPE", "SBCAPE"] and val > 2000:
+                        color = 'background-color: #ff9999'
+                    elif param in ["SRH_1"] and val > 150:
+                        color = 'background-color: #ffcc99'
+                    elif param in ["SHEAR_6"] and val > 40:
+                        color = 'background-color: #ffeb99'
+                    elif param in ["STP"] and val > 1:
+                        color = 'background-color: #ff9999'
+                    elif param in ["SCP"] and val > 2:
+                        color = 'background-color: #ffcc99'
+                    elif param in ["SHIP"] and val > 1:
+                        color = 'background-color: #ffff99'
+                    return [color] * len(row)
+
+                styled = df_params.style.apply(highlight_high, axis=1)
+                st.dataframe(styled, use_container_width=True)
+
+                st.markdown("---")
+                st.markdown("#### Parameter Interpretations")
+
+                explanations = {
+                    "MLCAPE": "Mixed-Layer CAPE (J/kg) — Primary instability fuel.\n• <1000: Weak\n• 1000–2000: Moderate\n• >2000: Strong\n• >3000: Extreme",
+                    "MUCAPE": "Most Unstable CAPE (J/kg) — Uses the most buoyant parcel in lower levels.\nOften higher than MLCAPE in elevated storms.",
+                    "SBCAPE": "Surface-Based CAPE (J/kg) — Energy available if a surface parcel rises.\nCritical for daytime surface-based convection.",
+                    "MLCIN": "Mixed-Layer CIN (J/kg) — Convective inhibition (cap strength).\n• >-50: Weak cap\n• <-100: Strong cap (storms suppressed)",
+                    "LCL": "Lifted Condensation Level (m AGL) — Cloud base height.\n• <1000m: Low bases → higher tornado risk\n• >2000m: High bases → hail/wind dominant",
+                    "DCAPE": "Downdraft CAPE (J/kg) — Potential for strong downdrafts.\n• >800: Strong gust potential\n• >1000: Severe wind/derecho risk",
+                    "SRH_1": "0–1 km Storm-Relative Helicity (m²/s²) — Low-level rotation.\n• >100: Notable\n• >150: High tornado potential\n• >250: Violent tornado risk",
+                    "SRH_3": "0–3 km SRH — Mid-level rotation for supercells.\n• >200: Strong supercell potential",
+                    "SRH_EFF": "Effective-layer SRH — Most relevant inflow layer.\nOften better predictor than fixed layers.",
+                    "SHEAR_6": "0–6 km bulk shear (kt) — Deep-layer organization.\n• <30: Multicell\n• 30–40: Multicell/supercell mix\n• >40: Supercells likely\n• >60: High-end severe",
+                    "SHEAR_1": "0–1 km shear (kt) — Low-level turning.\n• >20 kt: Enhanced tornado risk",
+                    "STP": "Significant Tornado Parameter — Combines CAPE, shear, SRH, LCL.\n• >1: Significant (EF2+) tornadoes possible\n• >3: High risk",
+                    "SCP": "Supercell Composite — Favorable supercell environment.\n• >1: Supercells possible\n• >3: High likelihood",
+                    "SHIP": "Significant Hail Parameter — Large hail (>2\") potential.\n• >1: Significant hail possible",
+                    "EHI": "Energy Helicity Index — Tornado potential (MLCAPE × SRH_3).\n• >1: Notable\n• >2: Strong tornado risk",
+                    "SWEAT": "Severe Weather Threat Index — Legacy severe index.\n• >300: Severe possible\n• >400: High severe risk",
+                    "K_INDEX": "K-Index — Thunderstorm potential from moisture.\n• >30: Likely\n• >40: Numerous thunderstorms",
+                    "TT_INDEX": "Total Totals — Instability index.\n• >50: Strong storms possible",
+                    "LR_0_3": "0–3 km lapse rate (°C/km) — Updraft strength.\n• >7.5: Strong updrafts\n• >8.5: Large hail likely",
+                    "LR_700_500": "700–500 mb lapse rate — Mid-level steepness.\n• >7: Supports strong storms",
+                    "LR_850_500": "850–500 mb lapse rate — Overall instability.\n• >6.5: Unstable",
+                    "SHOWALTER": "Showalter Index — Elevated storm stability.\n• <0: Unstable\n• <-3: Strongly unstable",
+                    "LIFTED_INDEX": "Best Lifted Index at 500 mb.\n• <-4: Moderate instability\n• <-6: Strong\n• <-8: Extreme",
+                    "RM_SPEED": "Estimated right-mover supercell motion speed (kt).",
+                }
+
+                categories = {
+                    "🔥 Instability & Buoyancy": ["MLCAPE", "MUCAPE", "SBCAPE", "MLCIN", "LCL", "DCAPE"],
+                    "🌀 Shear & Helicity": ["SHEAR_6", "SHEAR_3", "SHEAR_1", "SRH_1", "SRH_3", "SRH_EFF"],
+                    "⚡ Composite Indices": ["STP", "SCP", "SHIP", "EHI", "SWEAT"],
+                    "📊 Lapse Rates & Stability": ["LR_0_3", "LR_700_500", "LR_850_500", "K_INDEX", "TT_INDEX", "SHOWALTER", "LIFTED_INDEX"],
+                    "➡️ Other": ["RM_SPEED"]
+                }
+
+                for category_name, params in categories.items():
+                    st.markdown(f"**{category_name}**")
+                    cols = st.columns(3)
+                    for i, param in enumerate(params):
+                        with cols[i % 3]:
+                            val = p.get(param, np.nan)
+                            display_val = f"{val:.1f}" if not np.isnan(val) else "N/A"
+                            with st.expander(f"{param}: {display_val}"):
+                                st.write(explanations.get(param, "No detailed explanation available."))
+
             else:
-                st.info("Run analysis to view")
+                st.info("Run analysis to view detailed parameters.")
 
         with tab3:
             if df is not None:
