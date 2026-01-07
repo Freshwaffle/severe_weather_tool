@@ -448,28 +448,31 @@ if st.button("🚀 Run Analysis", type="primary"):
                 df_params.index.name = "Parameter"
                 df_params = df_params.reset_index()
 
-                # Fixed highlighting function — no row lookup
-                def highlight_high(val, param):
+                # Simple, safe highlighting using a dictionary lookup
+                def get_color(param, val):
                     if pd.isna(val):
                         return ''
                     if param in ["MLCAPE", "MUCAPE", "SBCAPE"] and val > 2000:
-                        return 'background-color: #ff9999'
+                        return 'background-color: #ff9999'  # red
                     if param == "SRH_1" and val > 150:
-                        return 'background-color: #ffcc99'
+                        return 'background-color: #ffcc99'  # orange
                     if param == "SHEAR_6" and val > 40:
+                        return 'background-color: #ffeb99'  # yellow-orange
+                    if param == "DCAPE" and val > 1000:
                         return 'background-color: #ffeb99'
                     if param == "STP" and val > 1:
                         return 'background-color: #ff9999'
                     if param == "SCP" and val > 2:
                         return 'background-color: #ffcc99'
                     if param == "SHIP" and val > 1:
-                        return 'background-color: #ffff99'
-                    if param == "DCAPE" and val > 1000:
-                        return 'background-color: #ffeb99'
+                        return 'background-color: #ffff99'  # yellow
                     return ''
 
-                # Apply highlighting per cell using a lambda
-                styled = df_params.style.map(lambda val: highlight_high(val, df_params.loc[df_params['Value'] == val, 'Parameter'].iloc[0] if len(df_params[df_params['Value'] == val]) > 0 else ''))
+                # Apply color to the 'Value' column only
+                def style_row(row):
+                    return [''] * len(row) if row.name != 'Value' else [get_color(row['Parameter'], row['Value'])]
+
+                styled = df_params.style.apply(lambda row: [get_color(row['Parameter'], row['Value']) if i == 1 else '' for i in range(len(row))], axis=1)
 
                 st.dataframe(styled, use_container_width=True)
 
@@ -523,7 +526,6 @@ if st.button("🚀 Run Analysis", type="primary"):
 
             else:
                 st.info("Run analysis to view detailed parameters.")
-
         with tab3:
             if df is not None:
                 plot_skewt(df, station_label)
