@@ -11,14 +11,77 @@ import matplotlib.pyplot as plt
 from metpy.plots import SkewT, Hodograph
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import plyer
-import sounderpy as spy  # Model soundings
+import sounderpy as spy
 
-# [Stations and radars dicts — keep your cleaned versions, removed duplicate MHX]
+# =========================
+# Stations (duplicate MHX removed)
+# =========================
+stations = {
+    'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82), 'AFC': (61.27, -149.99),
+    'AKQ': (37.08, -76.63), 'ALB': (42.75, -73.80), 'AMA': (35.22, -101.70), 'AMC': (38.53, -121.30),
+    'AMX': (25.62, -80.42), 'APX': (44.90, -84.72), 'BIS': (46.77, -100.75), 'BMX': (33.17, -86.77),
+    'BOI': (43.57, -116.22), 'BRO': (25.90, -97.43), 'BUF': (42.93, -78.73), 'CAR': (46.87, -68.02),
+    'CHS': (32.90, -80.03), 'CHX': (41.67, -69.97), 'CKL': (32.90, -87.25), 'CRP': (27.77, -97.50),
+    'DDC': (37.77, -99.97), 'DEN': (39.75, -104.87), 'DNR': (39.75, -104.87), 'DRT': (29.37, -100.92),
+    'DTX': (42.70, -83.47), 'DVN': (41.61, -90.58), 'DYX': (32.54, -99.25), 'EKA': (40.80, -124.16),
+    'EPZ': (31.90, -106.70), 'EWX': (29.70, -98.03), 'FFC': (33.36, -84.56), 'FGZ': (35.23, -111.82),
+    'FWD': (32.79, -97.30), 'GGW': (48.22, -106.62), 'GJT': (39.11, -108.53), 'GRB': (44.48, -88.13),
+    'GRR': (42.89, -85.54), 'GSO': (36.08, -79.95), 'GYX': (43.89, -70.26), 'HNX': (36.31, -119.63),
+    'IAD': (38.95, -77.45), 'ILN': (39.42, -83.82), 'ILX': (40.15, -89.34), 'INL': (48.57, -93.38),
+    'JAN': (32.32, -90.08), 'JAX': (30.48, -81.70), 'KEY': (24.55, -81.75), 'LBF': (41.13, -100.68),
+    'LCH': (30.12, -93.22), 'LIX': (30.34, -89.83), 'LKN': (40.87, -115.73), 'LOT': (41.60, -88.08),
+    'LZK': (34.84, -92.26), 'MAF': (31.95, -102.18), 'MFL': (25.75, -80.38), 'MHX': (34.78, -76.88),
+    'MOB': (30.68, -88.24), 'MPX': (44.85, -93.57), 'MTR': (37.73, -122.28), 'OAK': (37.72, -122.22),
+    'OKX': (40.87, -72.86), 'OTX': (47.68, -117.63), 'OUN': (35.23, -97.46), 'PDT': (45.70, -118.97),
+    'PIT': (40.50, -80.22), 'PSR': (33.43, -112.02), 'REV': (39.57, -119.79), 'RIW': (43.07, -108.47),
+    'RNK': (37.20, -80.41), 'SGX': (32.87, -117.13), 'SHV': (32.45, -93.84), 'SJT': (31.37, -100.49),
+    'SLE': (44.92, -123.00), 'SLC': (40.78, -111.97), 'SGF': (37.23, -93.38), 'TBW': (27.70, -82.40),
+    'TFX': (47.46, -111.38), 'TLH': (30.40, -84.35), 'TOP': (39.07, -95.62), 'TWC': (32.22, -110.96),
+    'UIL': (47.95, -124.55), 'UNR': (44.07, -103.12), 'VBG': (34.73, -120.58), 'VEF': (36.05, -115.18),
+    'WAL': (37.85, -75.48), 'YAK': (59.51, -139.67), 'YMO': (46.48, -84.51),
+}
+
+radars = {
+    'KABR': (45.45, -98.41), 'KABX': (35.15, -106.82), 'KAKQ': (36.98, -77.00), 'KAMA': (35.22, -101.71),
+    'KAMX': (25.61, -80.41), 'KAPX': (44.91, -84.72), 'KARX': (43.82, -91.19), 'KATX': (47.68, -122.50),
+    'KBBX': (38.82, -121.63), 'KBGM': (42.20, -75.98), 'KBHX': (40.50, -124.29), 'KBIS': (46.77, -100.76),
+    'KBLX': (45.85, -108.61), 'KBMX': (33.17, -86.77), 'KBOX': (41.96, -71.14), 'KBRO': (25.92, -97.42),
+    'KBUF': (42.95, -78.74), 'KBYX': (24.60, -81.70), 'KCAE': (33.95, -81.12), 'KCBW': (46.03, -67.81),
+    'KCBX': (43.49, -116.24), 'KCCX': (40.92, -78.00), 'KCLE': (41.41, -81.86), 'KCLX': (32.66, -81.04),
+    'KCRP': (27.78, -97.51), 'KCXX': (44.51, -73.17), 'KDAX': (38.50, -121.68), 'KDDC': (37.76, -99.97),
+    'KDGX': (32.28, -89.98), 'KDLH': (46.84, -92.21), 'KDMX': (41.73, -93.72), 'KDOX': (38.83, -75.44),
+    'KDTX': (42.70, -83.47), 'KDVN': (41.61, -90.58), 'KDYX': (32.54, -99.25), 'KEAX': (38.81, -94.26),
+    'KEMX': (31.89, -110.63), 'KENX': (42.59, -74.06), 'KEOX': (31.46, -85.46), 'KEPZ': (31.87, -106.70),
+    'KEVX': (30.56, -85.92), 'KEWX': (29.70, -98.03), 'KEYX': (35.10, -117.56), 'KFCX': (37.02, -80.27),
+    'KFDX': (34.63, -103.63), 'KFFC': (33.36, -84.57), 'KFDR': (34.36, -98.98), 'KFSX': (35.29, -111.82),
+    'KFTG': (39.79, -104.55), 'KFWS': (32.57, -97.30), 'KGGW': (48.21, -106.63), 'KGJX': (39.06, -108.13),
+    'KGLD': (39.07, -101.70), 'KGRB': (44.50, -88.11), 'KGRK': (30.72, -97.38), 'KGRR': (42.89, -85.55),
+    'KGSP': (34.88, -82.22), 'KGUAM': (13.46, 144.81), 'KGWX': (32.67, -90.90), 'KGYX': (43.89, -70.26),
+    'KHDX': (33.08, -106.12), 'KHGX': (29.47, -95.08), 'KHNX': (36.31, -119.63), 'KHPX': (36.74, -87.29),
+    'KHTX': (34.93, -86.08), 'KICT': (37.65, -97.44), 'KICX': (37.59, -112.86), 'KILN': (39.42, -83.82),
+    'KILX': (40.15, -89.34), 'KIND': (39.71, -86.28), 'KINX': (36.18, -95.56), 'KIWA': (33.29, -111.67),
+    'KIWX': (41.41, -85.70), 'KJAN': (32.32, -90.08), 'KJAX': (30.48, -81.70), 'KJGX': (32.67, -83.35),
+    'KJKL': (37.59, -83.31), 'KLBB': (33.65, -101.81), 'KLCH': (30.13, -93.22), 'KLGX': (47.12, -124.11),
+    'KLIX': (30.34, -89.83), 'KLNX': (41.96, -100.58), 'KLOT': (41.60, -88.08), 'KLOX': (34.20, -119.13),
+    'KLRX': (40.74, -116.80), 'KLSX': (38.70, -90.68), 'KLTX': (33.99, -78.43), 'KLVX': (37.98, -85.94),
+    'KLWX': (38.98, -77.48), 'KLZK': (34.84, -92.26), 'KMAF': (31.94, -102.19), 'KMAX': (42.08, -122.72),
+    'KMBX': (48.39, -100.86), 'KMHX': (34.78, -76.88), 'KMKX': (42.97, -88.55), 'KMLB': (28.11, -80.65),
+    'KMOB': (30.68, -88.24), 'KMPX': (44.85, -93.57), 'KMQT': (46.53, -87.55), 'KMSX': (47.04, -113.99),
+    'KMTX': (41.26, -112.45), 'KMUX': (37.16, -121.90), 'KMVX': (47.53, -97.53), 'KMXX': (32.54, -85.79),
+    'KNKX': (32.92, -117.04), 'KNQA': (35.34, -89.87), 'KOAX': (41.32, -96.37), 'KOHX': (36.25, -86.56),
+    'KOKX': (40.87, -72.86), 'KOTX': (47.68, -117.63), 'KOUN': (35.24, -97.46), 'KPAH': (37.07, -88.77),
+    'KPBZ': (40.53, -80.22), 'KPDT': (45.69, -118.99), 'KPDX': (45.60, -122.60), 'KPOE': (31.16, -92.98),
+    'KPSR': (33.43, -112.02), 'KPUX': (38.46, -104.18), 'KRAX': (35.67, -78.49), 'KRIW': (43.07, -108.48),
+    'KRLX': (38.31, -81.72), 'KRTX': (45.72, -122.97), 'KSFX': (43.11, -112.69), 'KSGF': (37.24, -93.40),
+    'KSHV': (32.45, -93.84), 'KSJT': (31.37, -100.49), 'KSOX': (33.82, -117.64), 'KSRX': (35.29, -94.36),
+    'KTLH': (30.40, -84.33), 'KTLX': (35.33, -97.28), 'KTWX': (38.99, -96.23), 'KTYX': (43.76, -75.68),
+    'KUDX': (44.12, -102.83), 'KUEX': (40.32, -98.44), 'KVAX': (30.90, -83.00), 'KVBX': (34.84, -120.40),
+    'KVNX': (36.74, -98.13), 'KVTX': (34.41, -119.18), 'KVWX': (37.59, -87.72), 'KYUX': (43.89, -75.03),
+}
 
 # =========================
 # Utility Functions
 # =========================
-
 def get_utc_now():
     return datetime.datetime.now(datetime.timezone.utc)
 
@@ -29,9 +92,8 @@ def get_location():
         loc = data.get('loc', '').split(',')
         if len(loc) == 2:
             return float(loc[0]), float(loc[1])
-    except Exception:
+    except:
         return None, None
-    return None, None
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371.0
@@ -42,8 +104,32 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_spc_risk(lat, lon):
-    # [Your existing function — unchanged]
+    url = "https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query"
+    params = {"where": "1=1", "outFields": "*", "f": "geojson", "outSR": "4326"}
+    try:
+        data = requests.get(url, params=params, timeout=10).json()
+    except Exception as e:
+        return "Error fetching SPC outlook"
 
+    pt = Point(lon, lat)
+    hierarchy = ["TSTM", "MRGL", "SLGT", "ENH", "MDT", "HIGH"]
+    found = []
+    for f in data.get("features", []):
+        try:
+            poly = shape(f["geometry"])
+            if poly.contains(pt):
+                label = f["properties"].get("LABEL", "TSTM")
+                found.append(label)
+        except:
+            continue
+    if not found:
+        return "No Risk"
+    found.sort(key=lambda x: hierarchy.index(x))
+    return found[-1]
+
+# =========================
+# NWS API Functions
+# =========================
 def get_nws_data(lat, lon):
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
     points_url = f"https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
@@ -52,29 +138,71 @@ def get_nws_data(lat, lon):
         props = resp['properties']
         return props.get('radarStation'), props.get('forecast')
     except Exception as e:
-        st.error(f"NWS points API error: {e}")
+        st.error(f"NWS points error: {e}")
         return None, None
 
-# [get_alerts, get_forecast, get_mesoscale_discussions — keep as-is]
+def get_alerts(lat, lon):
+    headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
+    alerts_url = f"https://api.weather.gov/alerts/active?point={lat:.4f},{lon:.4f}"
+    try:
+        resp = requests.get(alerts_url, headers=headers, timeout=10).json()
+        features = resp.get('features', [])
+        severe_alerts = [f['properties'] for f in features if 'Severe' in f['properties'].get('severity', '') or 'Tornado' in f['properties'].get('event', '') or 'Thunderstorm' in f['properties'].get('event', '')]
+        return severe_alerts
+    except Exception as e:
+        st.error(f"Alerts error: {e}")
+        return []
+
+def get_forecast(forecast_url):
+    if not forecast_url:
+        return []
+    headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
+    try:
+        resp = requests.get(forecast_url, headers=headers, timeout=10).json()
+        return resp['properties']['periods']
+    except Exception as e:
+        st.error(f"Forecast error: {e}")
+        return []
+
+def get_mesoscale_discussions():
+    url = "https://www.spc.noaa.gov/products/md/"
+    try:
+        resp = requests.get(url, timeout=10).text
+        mds = [line.strip() for line in resp.splitlines() if "Mesoscale Discussion" in line][:5]
+        return mds or ["No current Mesoscale Discussions."]
+    except:
+        return ["Unable to load MDs."]
 
 # =========================
 # Sounding Fetching
 # =========================
-
 def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=None, forecast_hour=0):
     now = get_utc_now()
 
     if sounding_type == "Observed":
         if not station_code:
             return None, None, None
-        # [Your full observed fetching code with cycle_times loop]
-        # ... (keep exactly as before)
+        cycle_hour = 12 if now.hour >= 12 else 0
+        cycle_times = [
+            now.replace(hour=cycle_hour, minute=0, second=0, microsecond=0),
+            (now - datetime.timedelta(hours=12)).replace(hour=(0 if cycle_hour == 12 else 12), minute=0, second=0, microsecond=0)
+        ]
+        for cycle in cycle_times:
+            try:
+                df = WyomingUpperAir.request_data(cycle, station_code)
+                df = df.dropna(subset=["pressure", "temperature", "dewpoint", "u_wind", "v_wind", "height"])
+                if len(df) >= 8:
+                    st.write(f"Using observed sounding from **{station_code}** at {cycle:%Y-%m-%d %HZ}")
+                    return df, station_code, cycle
+            except:
+                continue
+        st.warning("No recent observed sounding available.")
+        return None, None, None
 
-    else:  # Model
+    else:
         model = 'hrrr' if sounding_type == "HRRR" else 'rap'
         try:
-            # Correct keys from SounderPy v3.1.0
-            data = spy.get_model_data(model, {'lat': lat, 'lon': lon}, forecast_hour=forecast_hour)
+            data = spy.get_model_data(model, [lat, lon], forecast_hour=forecast_hour)
             df = pd.DataFrame({
                 'pressure': data['p'] * units.hPa,
                 'temperature': data['T'] * units.degC,
@@ -84,34 +212,163 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
                 'height': data['z'] * units.meter
             })
             valid_time = now + datetime.timedelta(hours=forecast_hour)
-            st.write(f"**{sounding_type}** forecast (+{forecast_hour}h) valid {valid_time:%Y-%m-%d %HZ}")
+            st.write(f"Using **{sounding_type}** forecast (+{forecast_hour}h) valid {valid_time:%Y-%m-%d %HZ}")
             return df, f"{sounding_type} +{forecast_hour}h", valid_time
         except Exception as e:
-            st.error(f"Model data error: {e}")
+            st.error(f"Model error: {e}")
             return None, None, None
 
 # =========================
-# Full analyze() — restored completely
+# Full Analysis Function
 # =========================
-
 def analyze(df):
-    # [Paste your entire original analyze() function here — all calculations, try/excepts, return dict]
-    # It works perfectly with both observed and model data
+    p = df['pressure'].values * units.hPa
+    T = df['temperature'].values * units.degC
+    Td = df['dewpoint'].values * units.degC
+    u = (df['u_wind'].values * units.knots).to('m/s')
+    v = (df['v_wind'].values * units.knots).to('m/s')
+    z = df['height'].values * units.meter
 
-# [storm_mode, CRI, plot_skewt — unchanged]
+    mlcape, mlcin = mpcalc.mixed_layer_cape_cin(p, T, Td)
+    mucape, mucin = mpcalc.most_unstable_cape_cin(p, T, Td)
+    sbcape, sbcin = mpcalc.surface_based_cape_cin(p, T, Td)
+    lcl_p, _ = mpcalc.lcl(p[0], T[0], Td[0])
+    lcl_z = mpcalc.pressure_to_height_std(lcl_p)
+    lfc_p, _ = mpcalc.lfc(p, T, Td)
+    el_p, _ = mpcalc.el(p, T, Td)
+
+    def lapse(z_slice, T_slice):
+        dz = np.diff(z_slice.magnitude)
+        dT = np.diff(T_slice.magnitude)
+        lr = -1000 * dT / dz
+        return np.nanmean(lr) if len(lr) > 0 else np.nan
+
+    lr_0_3 = lapse(z[z < 3000*units.meter], T[z < 3000*units.meter])
+    lr_700_500 = lapse(z[(p <= 700*units.hPa) & (p >= 500*units.hPa)], T[(p <= 700*units.hPa) & (p >= 500*units.hPa)])
+    lr_850_500 = lapse(z[(p <= 850*units.hPa) & (p >= 500*units.hPa)], T[(p <= 850*units.hPa) & (p >= 500*units.hPa)])
+
+    try:
+        dcape_val = mpcalc.downdraft_cape(p, T, Td).magnitude
+    except:
+        dcape_val = 0
+
+    try:
+        rm, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
+        rm_speed = mpcalc.wind_speed(rm[0], rm[1]).magnitude
+    except:
+        rm_speed = 0
+
+    try:
+        srh_1 = mpcalc.storm_relative_helicity(z, u, v, depth=1*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude
+        srh_3 = mpcalc.storm_relative_helicity(z, u, v, depth=3*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude
+        srh_eff = mpcalc.storm_relative_helicity(z, u, v, depth=mpcalc.effective_layer(p, T, Td, z)[0])[0].magnitude
+    except:
+        srh_1 = srh_3 = srh_eff = 0
+
+    try:
+        shear_1_mag = mpcalc.bulk_shear(p, u, v, height=z, depth=1*units.km)[0].magnitude
+        shear_3_mag = mpcalc.bulk_shear(p, u, v, height=z, depth=3*units.km)[0].magnitude
+        shear_6_mag = mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)[0].magnitude
+    except:
+        shear_1_mag = shear_3_mag = shear_6_mag = 0
+
+    wind_speed = mpcalc.wind_speed(u, v).to('knots')
+    wind_dir = mpcalc.wind_direction(u, v)
+    sweat = mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir).magnitude
+    k_index = mpcalc.k_index(p, T, Td).magnitude
+    tt_index = mpcalc.total_totals_index(p, T, Td).magnitude
+    showalter = mpcalc.showalter_index(p, T, Td).magnitude
+    lifted_index = mpcalc.lifted_index(p, T, Td).magnitude
+
+    try:
+        ehi = mpcalc.energy_helicity_index(mlcape, srh_3).magnitude
+    except:
+        ehi = 0
+    try:
+        ship = mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500).magnitude
+    except:
+        ship = 0
+    try:
+        stp = mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)).magnitude
+    except:
+        stp = 0
+    try:
+        scp = mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff).magnitude
+    except:
+        scp = 0
+
+    return {
+        "SBCAPE": sbcape.magnitude, "SBCIN": sbcin.magnitude,
+        "MLCAPE": mlcape.magnitude, "MLCIN": mlcin.magnitude,
+        "MUCAPE": mucape.magnitude, "MUCIN": mucin.magnitude,
+        "LCL": lcl_z.magnitude, "LFC": lfc_p.magnitude if lfc_p else np.nan,
+        "EL": el_p.magnitude if el_p else np.nan,
+        "DCAPE": dcape_val,
+        "LR_0_3": lr_0_3, "LR_700_500": lr_700_500, "LR_850_500": lr_850_500,
+        "SRH_1": srh_1, "SRH_3": srh_3, "SRH_EFF": srh_eff,
+        "SHEAR_1": shear_1_mag, "SHEAR_3": shear_3_mag, "SHEAR_6": shear_6_mag,
+        "SWEAT": sweat, "K_INDEX": k_index, "TT_INDEX": tt_index,
+        "SHOWALTER": showalter, "LIFTED_INDEX": lifted_index,
+        "EHI": ehi, "SHIP": ship, "STP": stp, "SCP": scp,
+        "RM_SPEED": rm_speed
+    }
+
+def storm_mode(p):
+    if p["MLCAPE"] < 250: return "Weak / Elevated"
+    if p["SHEAR_6"] > 40 and p["SRH_1"] > 150: return "Discrete Supercells"
+    if p["SHEAR_6"] > 35 and p["DCAPE"] > 1000: return "QLCS / Potential Derecho"
+    if p["SHEAR_6"] > 30: return "Linear / Embedded Supercells"
+    return "Pulse / Multicell"
+
+def CRI(p):
+    score = min(p["MLCAPE"]/1000, 3) + min(p["SHEAR_6"]/20, 3) + min(p["SRH_1"]/150, 3)
+    if p["DCAPE"] > 1000: score += 1
+    return round(score, 1)
+
+def plot_skewt(df, station):
+    fig = plt.figure(figsize=(12, 12))
+    skew = SkewT(fig, rotation=45)
+    skew.plot(df.pressure, df.temperature, 'r', linewidth=2)
+    skew.plot(df.pressure, df.dewpoint, 'g', linewidth=2)
+    skew.plot_barbs(df.pressure, df.u_wind, df.v_wind)
+    skew.ax.set_ylim(1050, 100)
+    skew.ax.set_xlim(-50, 50)
+
+    ax_hod = inset_axes(skew.ax, '40%', '40%', loc='upper right')
+    h = Hodograph(ax_hod, component_range=80)
+    h.add_grid(increment=20)
+    h.plot_colormapped(df.u_wind, df.v_wind, mpcalc.wind_speed(df.u_wind, df.v_wind))
+
+    plt.title(f"Skew-T & Hodograph — {station}")
+    plt.tight_layout()
+    plt.savefig('skewt_hodograph.png', dpi=150)
+    plt.close()
 
 # =========================
-# Streamlit UI
+# Parameter Explanations
 # =========================
+param_explanations = {
+    "MLCAPE": "Mixed Layer CAPE — primary instability parameter",
+    "SRH_1": "0-1 km Storm Relative Helicity — low-level rotation potential",
+    "SHEAR_6": "0-6 km bulk shear — organization potential",
+    "DCAPE": "Downdraft CAPE — gust potential",
+    "STP": "Significant Tornado Parameter",
+    "SCP": "Supercell Composite Parameter",
+    "SHIP": "Significant Hail Parameter",
+    "EHI": "Energy Helicity Index",
+}
 
+# =========================
+# Streamlit App
+# =========================
 st.set_page_config(page_title="Severe Weather Tool", layout="wide")
-st.title("Enhanced Severe Weather Interface")
+st.title("🌪️ Enhanced Severe Weather Interface")
 
-st.markdown("Select sounding type and location. Model soundings (HRRR/RAP) use your lat/lon directly.")
+st.markdown("Auto-detect or enter location • Choose observed or model sounding (HRRR/RAP)")
 
 col1, col2 = st.columns(2)
 with col1:
-    use_auto = st.checkbox("Auto-detect location", value=True)
+    use_auto = st.checkbox("Auto-detect my location", value=True)
 with col2:
     sounding_type = st.selectbox("Sounding Type", ["Observed", "HRRR", "RAP"])
 
@@ -119,52 +376,105 @@ if sounding_type != "Observed":
     forecast_hour = st.slider("Forecast Hour", 0, 18 if sounding_type == "HRRR" else 48, 0)
 else:
     forecast_hour = 0
-    st.selectbox("Observed Station", ["Auto"] + list(stations.keys()), key="station")
 
-st.selectbox("Radar Site", ["Auto"] + list(radars.keys()), key="radar")
+selected_station = st.selectbox("Observed Station (Auto = nearest)", ["Auto"] + list(stations.keys()))
+selected_radar = st.selectbox("Radar Site (Auto = NWS default)", ["Auto"] + list(radars.keys()))
 
-# Location input
+# Location
 if use_auto:
     lat, lon = get_location()
     if lat is None:
-        st.error("Auto-location failed. Please enter coordinates manually below.")
+        st.warning("Auto-location failed — enter manually below")
         use_auto = False
 
 if not use_auto or lat is None:
     col_lat, col_lon = st.columns(2)
-    lat = col_lat.number_input("Latitude", value=39.0, format="%.4f")
-    lon = col_lon.number_input("Longitude", value=-95.0, format="%.4f")
+    lat = col_lat.number_input("Latitude", value=35.23, format="%.4f")
+    lon = col_lon.number_input("Longitude", value=-97.46, format="%.4f")
 
-if st.button("Run Analysis"):
+if st.button("🚀 Run Analysis", type="primary"):
     if lat is None or lon is None:
-        st.error("Valid latitude and longitude required!")
-        st.stop()
+        st.error("Valid coordinates required!")
+    else:
+        st.success(f"Analyzing: {lat:.3f}°, {lon:.3f}°")
 
-    st.success(f"Location: {lat:.3f}°, {lon:.3f}°")
+        # Station logic
+        station_code = None
+        if sounding_type == "Observed":
+            if selected_station == "Auto":
+                distances = {code: haversine(lat, lon, coords[0], coords[1]) for code, coords in stations.items()}
+                station_code = min(distances, key=distances.get)
+            else:
+                station_code = selected_station
 
-    # Station for observed only
-    station_code = None
-    if sounding_type == "Observed":
-        selected = st.session_state.station
-        if selected == "Auto":
-            sorted_st = sorted(stations.items(), key=lambda x: haversine(lat, lon, x[1][0], x[1][1]))
-            station_code = sorted_st[0][0]
-        else:
-            station_code = selected
+        df, station_label, _ = fetch_sounding(station_code, sounding_type, lat, lon, forecast_hour)
 
-    # Fetch sounding
-    df, station_label, valid_time = fetch_sounding(
-        station_code=station_code,
-        sounding_type=sounding_type,
-        lat=lat, lon=lon,
-        forecast_hour=forecast_hour
-    )
+        radar_station, forecast_url = get_nws_data(lat, lon)
+        if selected_radar != "Auto":
+            radar_station = selected_radar
 
-    # NWS data — now safe because lat/lon validated
-    radar_station, forecast_url = get_nws_data(lat, lon)
-    if st.session_state.radar != "Auto":
-        radar_station = st.session_state.radar
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Overview", "Parameters", "Skew-T", "Radar & Sat", "Alerts & MDs", "Forecast"])
 
-    # [Your tabs and display code — unchanged, will now work]
+        with tab1:
+            risk = get_spc_risk(lat, lon)
+            st.write(f"**SPC Day 1 Risk:** {risk}")
+            st.image("https://www.spc.noaa.gov/products/outlook/day1otlk.gif")
 
-st.caption("Data: SPC, NWS, Wyoming Upper Air, SounderPy • Unofficial tool")
+            if df is not None:
+                p = analyze(df)
+                st.write(f"**Storm Mode:** {storm_mode(p)}")
+                st.write(f"**CRI Score:** {CRI(p)} / 10")
+
+                key_df = pd.DataFrame({
+                    "Parameter": ["MLCAPE", "SRH 0-1km", "Shear 0-6km", "DCAPE", "EHI", "SHIP", "STP", "SCP"],
+                    "Value": [p[k] for k in ["MLCAPE", "SRH_1", "SHEAR_6", "DCAPE", "EHI", "SHIP", "STP", "SCP"]],
+                    "Units": ["J/kg", "m²/s²", "kt", "J/kg", "", "", "", ""]
+                }).round(1)
+                st.table(key_df)
+
+                if CRI(p) >= 6 or risk in ["ENH", "MDT", "HIGH"]:
+                    st.error("⚠️ Elevated severe weather risk — stay alert!")
+                    try:
+                        plyer.notification.notify(title="Severe Weather", message=f"{risk} | CRI {CRI(p)}", timeout=10)
+                    except:
+                        pass
+
+        with tab2:
+            if df is not None:
+                p = analyze(df)
+                df_params = pd.DataFrame.from_dict(p, orient='index', columns=['Value']).round(1)
+                for param, row in df_params.iterrows():
+                    with st.expander(f"{param}: {row['Value']}"):
+                        st.write(param_explanations.get(param, "Key severe weather parameter"))
+            else:
+                st.info("Run analysis to view")
+
+        with tab3:
+            if df is not None:
+                plot_skewt(df, station_label)
+                st.image("skewt_hodograph.png")
+            else:
+                st.info("No sounding to display")
+
+        with tab4:
+            if radar_station:
+                st.image(f"https://radar.weather.gov/ridge/standard/{radar_station}_loop.gif", caption=f"{radar_station} Radar")
+            st.image("https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/GOES19-CONUS-GEOCOLOR-625x375.gif", caption="GOES-19 GeoColor")
+
+        with tab5:
+            alerts = get_alerts(lat, lon)
+            if alerts:
+                for a in alerts:
+                    st.write(f"**{a['event']}** — {a['headline']}")
+            else:
+                st.info("No active severe alerts")
+            st.subheader("SPC Mesoscale Discussions")
+            for md in get_mesoscale_discussions():
+                st.write(md)
+
+        with tab6:
+            periods = get_forecast(forecast_url)
+            for p in periods[:7]:
+                st.write(f"**{p['name']}**: {p['detailedForecast']}")
+
+st.caption("Unofficial tool • Data: NWS, SPC, Wyoming, SounderPy • Built for storm season 2026")
