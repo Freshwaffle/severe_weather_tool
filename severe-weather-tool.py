@@ -334,7 +334,7 @@ def analyze(df):
 # =========================
 # ... [your full Streamlit code from before, with tab2 using the safe display_val logic]
 
-        with tab2:
+with tab2:
             st.subheader("🔍 Detailed Parameter Breakdown")
             if df is not None:
                 p = analyze(df)
