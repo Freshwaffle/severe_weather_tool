@@ -14,7 +14,7 @@ import plyer
 import sounderpy as spy
 
 # =========================
-# Stations & Radars (cleaned)
+# Stations & Radars
 # =========================
 stations = {
     'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82), 'AFC': (61.27, -149.99),
@@ -219,7 +219,7 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
             return None, None, None
 
 # =========================
-# Analysis (with scalar conversion)
+# Analysis (with safe float conversion)
 # =========================
 def analyze(df):
     p = df['pressure'].values * units.hPa
@@ -274,7 +274,11 @@ def analyze(df):
 
     wind_speed = mpcalc.wind_speed(u, v).to('knots')
     wind_dir = mpcalc.wind_direction(u, v)
-    sweat = float(mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir).magnitude) if not mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir).isnan() else np.nan
+    try:
+        sweat = float(mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir).magnitude)
+    except:
+        sweat = np.nan
+
     k_index = float(mpcalc.k_index(p, T, Td).magnitude)
     tt_index = float(mpcalc.total_totals_index(p, T, Td).magnitude)
     showalter = float(mpcalc.showalter_index(p, T, Td).magnitude)
@@ -298,32 +302,165 @@ def analyze(df):
         scp = np.nan
 
     return {
-        "SBCAPE": float(sbcape.magnitude), "SBCIN": float(sbcin.magnitude),
-        "MLCAPE": float(mlcape.magnitude), "MLCIN": float(mlcin.magnitude),
-        "MUCAPE": float(mucape.magnitude), "MUCIN": float(mucin.magnitude),
-        "LCL": float(lcl_z.magnitude), "LFC": float(lfc_p.magnitude) if lfc_p else np.nan,
-        "EL": float(el_p.magnitude) if el_p else np.nan,
+        "SBCAPE": float(sbcape.magnitude),
+        "SBCIN": float(sbcin.magnitude),
+        "MLCAPE": float(mlcape.magnitude),
+        "MLCIN": float(mlcin.magnitude),
+        "MUCAPE": float(mucape.magnitude),
+        "MUCIN": float(mucin.magnitude),
+        "LCL": float(lcl_z.magnitude),
+        "LFC": float(lfc_p.magnitude) if lfc_p is not None else np.nan,
+        "EL": float(el_p.magnitude) if el_p is not None else np.nan,
         "DCAPE": dcape_val,
         "LR_0_3": float(lr_0_3) if not np.isnan(lr_0_3) else np.nan,
         "LR_700_500": float(lr_700_500) if not np.isnan(lr_700_500) else np.nan,
         "LR_850_500": float(lr_850_500) if not np.isnan(lr_850_500) else np.nan,
-        "SRH_1": srh_1, "SRH_3": srh_3, "SRH_EFF": srh_eff,
-        "SHEAR_1": shear_1_mag, "SHEAR_3": shear_3_mag, "SHEAR_6": shear_6_mag,
-        "SWEAT": sweat, "K_INDEX": k_index, "TT_INDEX": tt_index,
-        "SHOWALTER": showalter, "LIFTED_INDEX": lifted_index,
-        "EHI": ehi, "SHIP": ship, "STP": stp, "SCP": scp,
+        "SRH_1": srh_1,
+        "SRH_3": srh_3,
+        "SRH_EFF": srh_eff,
+        "SHEAR_1": shear_1_mag,
+        "SHEAR_3": shear_3_mag,
+        "SHEAR_6": shear_6_mag,
+        "SWEAT": sweat,
+        "K_INDEX": k_index,
+        "TT_INDEX": tt_index,
+        "SHOWALTER": showalter,
+        "LIFTED_INDEX": lifted_index,
+        "EHI": ehi,
+        "SHIP": ship,
+        "STP": stp,
+        "SCP": scp,
         "RM_SPEED": rm_speed
     }
 
-# (Keep storm_mode, CRI, plot_skewt as-is)
+def storm_mode(p):
+    if p["MLCAPE"] < 250:
+        return "Weak / Elevated"
+    if p["SHEAR_6"] > 40 and p["SRH_1"] > 150:
+        return "Discrete Supercells"
+    if p["SHEAR_6"] > 35 and p["DCAPE"] > 1000:
+        return "QLCS / Potential Derecho"
+    if p["SHEAR_6"] > 30:
+        return "Linear / Embedded Supercells"
+    return "Pulse / Multicell"
+
+def CRI(p):
+    score = min(p["MLCAPE"]/1000, 3) + min(p["SHEAR_6"]/20, 3) + min(p["SRH_1"]/150, 3)
+    if p["DCAPE"] > 1000:
+        score += 1
+    return round(score, 1)
+
+def plot_skewt(df, station):
+    fig = plt.figure(figsize=(12, 12))
+    skew = SkewT(fig, rotation=45)
+    skew.plot(df.pressure, df.temperature, 'r', linewidth=2, label='Temperature')
+    skew.plot(df.pressure, df.dewpoint, 'g', linewidth=2, label='Dewpoint')
+    skew.plot_barbs(df.pressure, df.u_wind, df.v_wind)
+    skew.ax.set_ylim(1050, 100)
+    skew.ax.set_xlim(-50, 50)
+    skew.ax.legend(loc='upper left')
+
+    ax_hod = inset_axes(skew.ax, '40%', '40%', loc='upper right')
+    h = Hodograph(ax_hod, component_range=80)
+    h.add_grid(increment=20)
+
+    try:
+        u_mag = df.u_wind.magnitude
+        v_mag = df.v_wind.magnitude
+        speed = mpcalc.wind_speed(df.u_wind, df.v_wind).magnitude
+    except AttributeError:
+        u_mag = df.u_wind.values
+        v_mag = df.v_wind.values
+        speed = np.sqrt(df.u_wind.values**2 + df.v_wind.values**2)
+
+    h.plot_colormapped(u_mag, v_mag, speed)
+
+    plt.title(f"Skew-T Log-P & Hodograph — {station}")
+    plt.tight_layout()
+    plt.savefig('skewt_hodograph.png', dpi=150, bbox_inches='tight')
+    plt.close()
 
 # =========================
-# Streamlit App (with fixed tab2)
+# Streamlit App
 # =========================
-# ... [your full Streamlit setup code] ...
+st.set_page_config(page_title="Severe Weather Tool", layout="wide")
+st.title("🌪️ Enhanced Severe Weather Interface")
+
+st.markdown("Auto-detect or enter location • Choose observed or model sounding (HRRR/RAP)")
+
+col1, col2 = st.columns(2)
+with col1:
+    use_auto = st.checkbox("Auto-detect my location", value=True)
+with col2:
+    sounding_type = st.selectbox("Sounding Type", ["Observed", "HRRR", "RAP"])
+
+if sounding_type != "Observed":
+    forecast_hour = st.slider("Forecast Hour", 0, 18 if sounding_type == "HRRR" else 48, 0)
+else:
+    forecast_hour = 0
+
+selected_station = st.selectbox("Observed Station (Auto = nearest)", ["Auto"] + list(stations.keys()))
+selected_radar = st.selectbox("Radar Site (Auto = NWS default)", ["Auto"] + list(radars.keys()))
+
+if use_auto:
+    lat, lon = get_location()
+    if lat is None:
+        st.warning("Auto-location failed — enter manually below")
+        use_auto = False
+
+if not use_auto or lat is None:
+    col_lat, col_lon = st.columns(2)
+    lat = col_lat.number_input("Latitude", value=35.23, format="%.4f")
+    lon = col_lon.number_input("Longitude", value=-97.46, format="%.4f")
+
+if st.button("🚀 Run Analysis", type="primary"):
+    if lat is None or lon is None:
+        st.error("Valid coordinates required!")
+    else:
+        st.success(f"Analyzing: {lat:.3f}°, {lon:.3f}°")
+
+        station_code = None
+        if sounding_type == "Observed":
+            if selected_station == "Auto":
+                distances = {code: haversine(lat, lon, coords[0], coords[1]) for code, coords in stations.items()}
+                station_code = min(distances, key=distances.get)
+            else:
+                station_code = selected_station
+
+        df, station_label, _ = fetch_sounding(station_code, sounding_type, lat, lon, forecast_hour)
+
+        radar_station, forecast_url = get_nws_data(lat, lon)
+        if selected_radar != "Auto":
+            radar_station = selected_radar
+
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Overview", "Parameters", "Skew-T", "Radar & Sat", "Alerts & MDs", "Forecast"])
+
+        with tab1:
+            risk = get_spc_risk(lat, lon)
+            st.write(f"**SPC Day 1 Risk:** {risk}")
+            st.image("https://www.spc.noaa.gov/products/outlook/day1otlk.gif")
+
+            if df is not None:
+                p = analyze(df)
+                st.write(f"**Storm Mode:** {storm_mode(p)}")
+                st.write(f"**CRI Score:** {CRI(p)} / 10")
+
+                key_df = pd.DataFrame({
+                    "Parameter": ["MLCAPE", "SRH 0-1km", "Shear 0-6km", "DCAPE", "EHI", "SHIP", "STP", "SCP"],
+                    "Value": [p[k] for k in ["MLCAPE", "SRH_1", "SHEAR_6", "DCAPE", "EHI", "SHIP", "STP", "SCP"]],
+                    "Units": ["J/kg", "m²/s²", "kt", "J/kg", "", "", "", ""]
+                }).round(1)
+                st.table(key_df)
+
+                if CRI(p) >= 6 or risk in ["ENH", "MDT", "HIGH"]:
+                    st.error("⚠️ Elevated severe weather risk — stay alert!")
+                    try:
+                        plyer.notification.notify(title="Severe Weather", message=f"{risk} | CRI {CRI(p)}", timeout=10)
+                    except:
+                        pass
 
         with tab2:
-            st.subheader("Detailed Parameter Breakdown")
+            st.subheader("🔍 Detailed Parameter Breakdown")
             if df is not None:
                 p = analyze(df)
 
@@ -353,14 +490,45 @@ def analyze(df):
                     return ''
 
                 styled = df_params.style.apply(lambda row: [get_color(row['Parameter'], row['Value']) if i == 1 else '' for i in range(len(row))], axis=1)
-                st.dataframe(styled, width='stretch')  # Updated from use_container_width
+                st.dataframe(styled, width='stretch')  # Updated: use 'stretch' instead of deprecated use_container_width
 
                 st.markdown("---")
                 st.markdown("#### Parameter Interpretations")
 
-                explanations = { ... }  # your full dict
+                explanations = {
+                    "MLCAPE": "Mixed-Layer CAPE (J/kg) — Primary instability fuel.\n• <1000: Weak\n• 1000–2000: Moderate\n• >2000: Strong\n• >3000: Extreme",
+                    "MUCAPE": "Most Unstable CAPE (J/kg) — Uses the most buoyant parcel in lower levels.\nOften higher than MLCAPE in elevated storms.",
+                    "SBCAPE": "Surface-Based CAPE (J/kg) — Energy available if a surface parcel rises.\nCritical for daytime surface-based convection.",
+                    "MLCIN": "Mixed-Layer CIN (J/kg) — Convective inhibition (cap strength).\n• >-50: Weak cap\n• <-100: Strong cap (storms suppressed)",
+                    "LCL": "Lifted Condensation Level (m AGL) — Cloud base height.\n• <1000m: Low bases → higher tornado risk\n• >2000m: High bases → hail/wind dominant",
+                    "DCAPE": "Downdraft CAPE (J/kg) — Potential for strong downdrafts.\n• >800: Strong gust potential\n• >1000: Severe wind/derecho risk",
+                    "SRH_1": "0–1 km Storm-Relative Helicity (m²/s²) — Low-level rotation.\n• >100: Notable\n• >150: High tornado potential\n• >250: Violent tornado risk",
+                    "SRH_3": "0–3 km SRH — Mid-level rotation for supercells.\n• >200: Strong supercell potential",
+                    "SRH_EFF": "Effective-layer SRH — Most relevant inflow layer.\nOften better predictor than fixed layers.",
+                    "SHEAR_6": "0–6 km bulk shear (kt) — Deep-layer organization.\n• <30: Multicell\n• 30–40: Multicell/supercell mix\n• >40: Supercells likely\n• >60: High-end severe",
+                    "SHEAR_1": "0–1 km shear (kt) — Low-level turning.\n• >20 kt: Enhanced tornado risk",
+                    "STP": "Significant Tornado Parameter — Combines CAPE, shear, SRH, LCL.\n• >1: Significant (EF2+) tornadoes possible\n• >3: High risk",
+                    "SCP": "Supercell Composite — Favorable supercell environment.\n• >1: Supercells possible\n• >3: High likelihood",
+                    "SHIP": "Significant Hail Parameter — Large hail (>2\") potential.\n• >1: Significant hail possible",
+                    "EHI": "Energy Helicity Index — Tornado potential (MLCAPE × SRH_3).\n• >1: Notable\n• >2: Strong tornado risk",
+                    "SWEAT": "Severe Weather Threat Index — Legacy severe index.\n• >300: Severe possible\n• >400: High severe risk",
+                    "K_INDEX": "K-Index — Thunderstorm potential from moisture.\n• >30: Likely\n• >40: Numerous thunderstorms",
+                    "TT_INDEX": "Total Totals — Instability index.\n• >50: Strong storms possible",
+                    "LR_0_3": "0–3 km lapse rate (°C/km) — Updraft strength.\n• >7.5: Strong updrafts\n• >8.5: Large hail likely",
+                    "LR_700_500": "700–500 mb lapse rate — Mid-level steepness.\n• >7: Supports strong storms",
+                    "LR_850_500": "850–500 mb lapse rate — Overall instability.\n• >6.5: Unstable",
+                    "SHOWALTER": "Showalter Index — Elevated storm stability.\n• <0: Unstable\n• <-3: Strongly unstable",
+                    "LIFTED_INDEX": "Best Lifted Index at 500 mb.\n• <-4: Moderate instability\n• <-6: Strong\n• <-8: Extreme",
+                    "RM_SPEED": "Estimated right-mover supercell motion speed (kt).",
+                }
 
-                categories = { ... }  # your categories
+                categories = {
+                    "🔥 Instability & Buoyancy": ["MLCAPE", "MUCAPE", "SBCAPE", "MLCIN", "LCL", "DCAPE"],
+                    "🌀 Shear & Helicity": ["SHEAR_6", "SHEAR_3", "SHEAR_1", "SRH_1", "SRH_3", "SRH_EFF"],
+                    "⚡ Composite Indices": ["STP", "SCP", "SHIP", "EHI", "SWEAT"],
+                    "📊 Lapse Rates & Stability": ["LR_0_3", "LR_700_500", "LR_850_500", "K_INDEX", "TT_INDEX", "SHOWALTER", "LIFTED_INDEX"],
+                    "➡️ Other": ["RM_SPEED"]
+                }
 
                 for category_name, params in categories.items():
                     st.markdown(f"**{category_name}**")
@@ -368,14 +536,39 @@ def analyze(df):
                     for i, param in enumerate(params):
                         with cols[i % 3]:
                             val = p.get(param, np.nan)
-                            # FINAL SAFE DISPLAY
-                            display_val = "N/A" if val is None or np.isnan(val) or val == np.nan else f"{float(val):.1f}"
+                            display_val = "N/A" if val is None or np.isnan(val) else f"{float(val):.1f}"
                             with st.expander(f"{param}: {display_val}"):
                                 st.write(explanations.get(param, "No detailed explanation available."))
 
             else:
                 st.info("Run analysis to view detailed parameters.")
 
-# ... rest of tabs ...
+        with tab3:
+            if df is not None:
+                plot_skewt(df, station_label)
+                st.image("skewt_hodograph.png")
+            else:
+                st.info("No sounding to display")
+
+        with tab4:
+            if radar_station:
+                st.image(f"https://radar.weather.gov/ridge/standard/{radar_station}_loop.gif", caption=f"{radar_station} Radar")
+            st.image("https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/GOES19-CONUS-GEOCOLOR-625x375.gif", caption="GOES-19 GeoColor")
+
+        with tab5:
+            alerts = get_alerts(lat, lon)
+            if alerts:
+                for a in alerts:
+                    st.write(f"**{a['event']}** — {a['headline']}")
+            else:
+                st.info("No active severe alerts")
+            st.subheader("SPC Mesoscale Discussions")
+            for md in get_mesoscale_discussions():
+                st.write(md)
+
+        with tab6:
+            periods = get_forecast(forecast_url)
+            for p in periods[:7]:
+                st.write(f"**{p['name']}**: {p['detailedForecast']}")
 
 st.caption("Unofficial tool • Data: NWS, SPC, Wyoming, SounderPy • Built for storm season 2026")
