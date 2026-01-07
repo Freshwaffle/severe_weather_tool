@@ -448,16 +448,15 @@ if st.button("🚀 Run Analysis", type="primary"):
                 df_params.index.name = "Parameter"
                 df_params = df_params.reset_index()
 
-                # Simple, safe highlighting using a dictionary lookup
                 def get_color(param, val):
                     if pd.isna(val):
                         return ''
                     if param in ["MLCAPE", "MUCAPE", "SBCAPE"] and val > 2000:
-                        return 'background-color: #ff9999'  # red
+                        return 'background-color: #ff9999'
                     if param == "SRH_1" and val > 150:
-                        return 'background-color: #ffcc99'  # orange
+                        return 'background-color: #ffcc99'
                     if param == "SHEAR_6" and val > 40:
-                        return 'background-color: #ffeb99'  # yellow-orange
+                        return 'background-color: #ffeb99'
                     if param == "DCAPE" and val > 1000:
                         return 'background-color: #ffeb99'
                     if param == "STP" and val > 1:
@@ -465,12 +464,8 @@ if st.button("🚀 Run Analysis", type="primary"):
                     if param == "SCP" and val > 2:
                         return 'background-color: #ffcc99'
                     if param == "SHIP" and val > 1:
-                        return 'background-color: #ffff99'  # yellow
+                        return 'background-color: #ffff99'
                     return ''
-
-                # Apply color to the 'Value' column only
-                def style_row(row):
-                    return [''] * len(row) if row.name != 'Value' else [get_color(row['Parameter'], row['Value'])]
 
                 styled = df_params.style.apply(lambda row: [get_color(row['Parameter'], row['Value']) if i == 1 else '' for i in range(len(row))], axis=1)
 
@@ -520,12 +515,14 @@ if st.button("🚀 Run Analysis", type="primary"):
                     for i, param in enumerate(params):
                         with cols[i % 3]:
                             val = p.get(param, np.nan)
-                            display_val = f"{val:.1f}" if not np.isnan(val) else "N/A"
+                            # Fixed: safe check for None and nan
+                            display_val = f"{val:.1f}" if (val is not None and not np.isnan(val)) else "N/A"
                             with st.expander(f"{param}: {display_val}"):
                                 st.write(explanations.get(param, "No detailed explanation available."))
 
             else:
                 st.info("Run analysis to view detailed parameters.")
+
         with tab3:
             if df is not None:
                 plot_skewt(df, station_label)
