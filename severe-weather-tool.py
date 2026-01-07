@@ -328,22 +328,34 @@ def CRI(p):
 def plot_skewt(df, station):
     fig = plt.figure(figsize=(12, 12))
     skew = SkewT(fig, rotation=45)
-    skew.plot(df.pressure, df.temperature, 'r', linewidth=2)
-    skew.plot(df.pressure, df.dewpoint, 'g', linewidth=2)
+
+    # Plot temperature and dewpoint (these are quantities, MetPy handles them fine)
+    skew.plot(df.pressure, df.temperature, 'r', linewidth=2, label='Temperature')
+    skew.plot(df.pressure, df.dewpoint, 'g', linewidth=2, label='Dewpoint')
+
+    # Barbs expect magnitude in knots — MetPy will handle the units
     skew.plot_barbs(df.pressure, df.u_wind, df.v_wind)
+
     skew.ax.set_ylim(1050, 100)
     skew.ax.set_xlim(-50, 50)
+    skew.ax.legend()
 
+    # Hodograph inset
     ax_hod = inset_axes(skew.ax, '40%', '40%', loc='upper right')
     h = Hodograph(ax_hod, component_range=80)
     h.add_grid(increment=20)
-    h.plot_colormapped(df.u_wind, df.v_wind, mpcalc.wind_speed(df.u_wind, df.v_wind))
+
+    # Critical fix: Use .magnitude to get unitless values for plot_colormapped
+    u_mag = df.u_wind.magnitude
+    v_mag = df.v_wind.magnitude
+    speed = mpcalc.wind_speed(df.u_wind, df.v_wind).magnitude  # or just np.sqrt(u_mag**2 + v_mag**2)
+
+    h.plot_colormapped(u_mag, v_mag, speed)
 
     plt.title(f"Skew-T & Hodograph — {station}")
     plt.tight_layout()
-    plt.savefig('skewt_hodograph.png', dpi=150)
+    plt.savefig('skewt_hodograph.png', dpi=150, bbox_inches='tight')
     plt.close()
-
 # =========================
 # Parameter Explanations
 # =========================
