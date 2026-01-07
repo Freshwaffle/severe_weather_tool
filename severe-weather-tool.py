@@ -515,8 +515,11 @@ if st.button("🚀 Run Analysis", type="primary"):
                     for i, param in enumerate(params):
                         with cols[i % 3]:
                             val = p.get(param, np.nan)
-                            # Fixed: safe check for None and nan
-                            display_val = f"{val:.1f}" if (val is not None and not np.isnan(val)) else "N/A"
+                            # FINAL FIX: Safe handling of None and NaN
+                            if val is None or np.isnan(val):
+                                display_val = "N/A"
+                            else:
+                                display_val = f"{val:.1f}"
                             with st.expander(f"{param}: {display_val}"):
                                 st.write(explanations.get(param, "No detailed explanation available."))
 
