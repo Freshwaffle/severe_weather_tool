@@ -14,7 +14,7 @@ import plyer
 import sounderpy as spy
 
 # =========================
-# Stations & Radars (from your original code)
+# Stations & Radars (your original list)
 # =========================
 stations = {
     'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82), 'AFC': (61.27, -149.99),
@@ -40,16 +40,30 @@ stations = {
     'UIL': (47.95, -124.55), 'UNR': (44.07, -103.12), 'VBG': (34.73, -120.58), 'VEF': (36.05, -115.18),
     'WAL': (37.85, -75.48), 'YAK': (59.51, -139.67), 'YMO': (46.48, -84.51),
 }
-
 radars = {
     'KABR': (45.45, -98.41), 'KABX': (35.15, -106.82), 'KAKQ': (36.98, -77.00), 'KAMA': (35.22, -101.71),
-    # ... (rest of your radars)
+    'KAMX': (25.61, -80.41), 'KAPX': (44.91, -84.72), 'KARX': (43.82, -91.19), 'KATX': (47.68, -122.50),
+    'KBBX': (38.82, -121.63), 'KBGM': (42.20, -75.98), 'KBHX': (40.50, -124.29), 'KBIS': (46.77, -100.76),
+    'KBLX': (45.85, -108.61), 'KBMX': (33.17, -86.77), 'KBOX': (41.96, -71.14), 'KBRO': (25.92, -97.42),
+    'KBUF': (42.95, -78.74), 'KBYX': (24.60, -81.70), 'KCAE': (33.95, -81.12), 'KCBW': (46.03, -67.81),
+    'KCBX': (43.49, -116.24), 'KCCX': (40.92, -78.00), 'KCLE': (41.41, -81.86), 'KCLX': (32.66, -81.04),
+    'KCRP': (27.78, -97.51), 'KCXX': (44.51, -73.17), 'KDAX': (38.50, -121.68), 'KDDC': (37.76, -99.97),
+    'KDGX': (32.28, -89.98), 'KDLH': (46.84, -92.21), 'KDMX': (41.73, -93.72), 'KDOX': (38.83, -75.44),
+    'KDTX': (42.70, -83.47), 'KDVN': (41.61, -90.58), 'KDYX': (32.54, -99.25), 'KEAX': (38.81, -94.26),
+    'KEMX': (31.89, -110.63), 'KENX': (42.59, -74.06), 'KEOX': (31.46, -85.46), 'KEPZ': (31.87, -106.70),
+    'KEVX': (30.56, -85.92), 'KEWX': (29.70, -98.03), 'KEYX': (35.10, -117.56), 'KFCX': (37.02, -80.27),
+    'KFDX': (34.63, -103.63), 'KFDR': (34.36, -98.98), 'KFFX': (43.44, -124.24), 'KFGF': (47.94, -97.18),
+    'KFGZ': (35.23, -111.82), 'KFWS': (32.57, -97.30), 'KFXA': (41.02, -92.33), 'KFXC': (34.91, -106.61),
+    'KGGW': (48.21, -106.63), 'KGJX': (39.06, -108.13), 'KGLD': (39.07, -101.70), 'KGSP': (34.88, -82.22),
+    'KGWX': (32.67, -90.90), 'KGYX': (43.89, -70.26), 'KHDX': (33.08, -106.12), 'KHGX': (29.47, -95.08),
+    'KHNX': (36.31, -119.63), 'KHPX': (36.74, -87.29), 'KHTX': (34.93, -86.08), 'KICT': (37.65, -97.44),
 }
 
 # =========================
 # Utility Functions
 # =========================
 def safe_float(val):
+    """Safely convert a masked array or value to float."""
     if val is None:
         return np.nan
     if np.ma.is_masked(val):
@@ -76,7 +90,7 @@ def haversine(lat1, lon1, lat2, lon2):
     R = 6371.0
     dlat = np.radians(lat2 - lat1)
     dlon = np.radians(lon2 - lon1)
-    a = np.sin(dlat / 2)**2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon / 2)**2
+    a = np.sin(dlat/2)**2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlon/2)**2
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c
 
@@ -104,7 +118,7 @@ def get_spc_risk(lat, lon):
     return found[-1]
 
 # =========================
-# NWS API functions
+# NWS data functions
 # =========================
 def get_nws_data(lat, lon):
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
@@ -146,7 +160,7 @@ def get_mesoscale_discussions():
         return ["Unable to load MDs."]
 
 # =========================
-# Fetch Sounding (sounderpy)
+# Fetch sounding with sounderpy
 # =========================
 def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=None, forecast_hour=0):
     now = get_utc_now()
@@ -190,7 +204,7 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
             return None, None, None
 
 # =========================
-# Analysis function (your existing code)
+# Analysis function
 # =========================
 def analyze(df):
     p = df['pressure'].values * units.hPa
@@ -222,7 +236,7 @@ def analyze(df):
     lr_700_500 = lapse(z[(p <= 700*units.hPa) & (p >= 500*units.hPa)], T[(p <= 700*units.hPa) & (p >= 500*units.hPa)])
     lr_850_500 = lapse(z[(p <= 850*units.hPa) & (p >= 500*units.hPa)], T[(p <= 850*units.hPa) & (p >= 500*units.hPa)])
 
-    # Downward CAPE
+    # Downdraft CAPE
     try:
         dcape_val = float(mpcalc.downdraft_cape(p, T, Td).magnitude)
     except:
@@ -230,25 +244,19 @@ def analyze(df):
 
     # Storm motion & SRH
     try:
-        storm_motion, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
-        rm_speed = float(mpcalc.wind_speed(storm_motion[0], storm_motion[1]).magnitude)
+        rm, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
+        rm_speed = float(mpcalc.wind_speed(rm[0], rm[1]).magnitude)
     except:
-        storm_motion = (np.nan, np.nan)
         rm_speed = np.nan
+
     try:
-        srh_1 = float(mpcalc.storm_relative_helicity(z, u, v, depth=1*units.km, storm_u=storm_motion[0], storm_v=storm_motion[1])[0].magnitude)
-    except:
-        srh_1 = np.nan
-    try:
-        srh_3 = float(mpcalc.storm_relative_helicity(z, u, v, depth=3*units.km, storm_u=storm_motion[0], storm_v=storm_motion[1])[0].magnitude)
-    except:
-        srh_3 = np.nan
-    try:
+        srh_1 = float(mpcalc.storm_relative_helicity(z, u, v, depth=1*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude)
+        srh_3 = float(mpcalc.storm_relative_helicity(z, u, v, depth=3*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude)
         srh_eff = float(mpcalc.storm_relative_helicity(z, u, v, depth=mpcalc.effective_layer(p, T, Td, z)[0])[0].magnitude)
     except:
-        srh_eff = np.nan
+        srh_1 = srh_3 = srh_eff = np.nan
 
-    # Shear
+    # Shear magnitudes
     try:
         shear_1 = mpcalc.bulk_shear(p, u, v, height=z, depth=1*units.km)
         shear_1_mag = safe_float(shear_1)
@@ -270,41 +278,24 @@ def analyze(df):
     wind_dir = mpcalc.wind_direction(u, v)
 
     # Wrap with safe_float
-    mlcape = safe_float(mlcape)
-    mlcin = safe_float(mlcin)
-    mucape = safe_float(mucape)
-    mucin = safe_float(mucin)
-    sbcape = safe_float(sbcape)
-    sbcin = safe_float(sbcin)
-    lcl_z = safe_float(lcl_z)
-    lfc_p = safe_float(lfc_p)
-    el_p = safe_float(el_p)
-    dcape_val = safe_float(dcape_val)
-    srh_1 = safe_float(srh_1)
-    srh_3 = safe_float(srh_3)
-    srh_eff = safe_float(srh_eff)
-    shear_1_mag = safe_float(shear_1_mag)
-    shear_3_mag = safe_float(shear_3_mag)
-    shear_6_mag = safe_float(shear_6_mag)
+    def safe_float(val):
+        if np.ma.is_masked(val):
+            return np.nan
+        try:
+            return float(val.magnitude if hasattr(val, 'magnitude') else val)
+        except:
+            return np.nan
 
-    # EHI
-    try:
-        ehi = mpcalc.energy_helicity_index(mlcape * units('J/kg'), srh_3 * units('m^2/s^2'))
-        ehi = safe_float(ehi)
-    except:
-        ehi = np.nan
-
-    # Return all parameters
     return {
-        "SBCAPE": float(sbcape),
-        "SBCIN": float(sbcin),
-        "MLCAPE": float(mlcape),
-        "MLCIN": float(mlcin),
-        "MUCAPE": float(mucape),
-        "MUCIN": float(mucin),
-        "LCL": float(lcl_z),
-        "LFC": float(lfc_p) if lfc_p is not None else np.nan,
-        "EL": float(el_p) if el_p is not None else np.nan,
+        "SBCAPE": float(sbcape.magnitude),
+        "SBCIN": float(sbcin.magnitude),
+        "MLCAPE": float(mlcape.magnitude),
+        "MLCIN": float(mlcin.magnitude),
+        "MUCAPE": float(mucape.magnitude),
+        "MUCIN": float(mucin.magnitude),
+        "LCL": float(lcl_z.magnitude),
+        "LFC": float(lfc_p.magnitude) if lfc_p is not None else np.nan,
+        "EL": float(el_p.magnitude) if el_p is not None else np.nan,
         "DCAPE": dcape_val,
         "LR_0_3": float(lr_0_3) if not np.isnan(lr_0_3) else np.nan,
         "LR_700_500": float(lr_700_500) if not np.isnan(lr_700_500) else np.nan,
@@ -320,51 +311,107 @@ def analyze(df):
         "TT_INDEX": safe_float(mpcalc.total_totals_index(p, T, Td)),
         "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
-        "EHI": ehi,
-        "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T)*units.m, T[p.argmin()], lr_700_500)),
+        "EHI": safe_float(mpcalc.energy_helicity_index(mlcape, srh_3)),
+        "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500)),
         "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
         "SCP": safe_float(mpcalc.supercell_composite(mucape, float(rm_speed), srh_eff)),
         "RM_SPEED": float(mpcalc.wind_speed(u, v).magnitude)
     }
 
 # =========================
+# Storm mode & CRI calculation
+# =========================
+def storm_mode(p):
+    if p["MLCAPE"] < 250:
+        return "Weak / Elevated"
+    if p["SHEAR_6"] > 40 and p["SRH_1"] > 150:
+        return "Discrete Supercells"
+    if p["SHEAR_6"] > 35 and p["DCAPE"] > 1000:
+        return "QLCS / Potential Derecho"
+    if p["SHEAR_6"] > 30:
+        return "Linear / Embedded Supercells"
+    return "Pulse / Multicell"
+
+def CRI(p):
+    score = min(p["MLCAPE"]/1000, 3) + min(p["SHEAR_6"]/20, 3) + min(p["SRH_1"]/150, 3)
+    if p["DCAPE"] > 1000:
+        score += 1
+    return round(score, 1)
+
+# =========================
+# Plot skewt function
+# =========================
+def plot_skewt(df, station):
+    fig = plt.figure(figsize=(12, 12))
+    skew = SkewT(fig, rotation=45)
+    skew.plot(df.pressure, df.temperature, 'r', linewidth=2, label='Temperature')
+    skew.plot(df.pressure, df.dewpoint, 'g', linewidth=2, label='Dewpoint')
+    skew.plot_barbs(df.pressure, df.u_wind, df.v_wind)
+    skew.ax.set_ylim(1050, 100)
+    skew.ax.set_xlim(-50, 50)
+    skew.ax.legend(loc='upper left')
+
+    ax_hod = inset_axes(skew.ax, '40%', '40%', loc='upper right')
+    h = Hodograph(ax_hod, component_range=80)
+    h.add_grid(increment=20)
+
+    try:
+        u_mag = df.u_wind.magnitude
+        v_mag = df.v_wind.magnitude
+        speed = mpcalc.wind_speed(df.u_wind, df.v_wind).magnitude
+    except AttributeError:
+        u_mag = df.u_wind.values
+        v_mag = df.v_wind.values
+        speed = np.sqrt(df.u_wind.values**2 + df.v_wind.values**2)
+
+    h.plot_colormapped(u_mag, v_mag, speed)
+
+    plt.title(f"Skew-T Log-P & Hodograph — {station}")
+    plt.tight_layout()
+    plt.savefig('skewt_hodograph.png', dpi=150, bbox_inches='tight')
+    plt.close()
+
+# =========================
 # Main Streamlit app
 # =========================
 st.set_page_config(page_title="Severe Weather Tool", layout="wide")
 st.title("🌪️ Enhanced Severe Weather Interface")
-
 st.markdown("Auto-detect or enter location • Choose observed or model sounding (HRRR/RAP)")
 
-# Location input
-use_auto = st.checkbox("Auto-detect my location", value=True)
-lat, lon = None, None
-if use_auto:
-    lat, lon = get_location()
-    if lat is None:
-        st.warning("Auto-location failed — please enter manually.")
-        use_auto = False
-if not use_auto:
-    col_lat, col_lon = st.columns(2)
-    lat = col_lat.number_input("Latitude", value=35.23, format="%.4f")
-    lon = col_lon.number_input("Longitude", value=-97.46, format="%.4f")
+# Location detection
+col1, col2 = st.columns(2)
+with col1:
+    use_auto = st.checkbox("Auto-detect my location", value=True)
+with col2:
+    sounding_type = st.selectbox("Sounding Type", ["Observed", "HRRR", "RAP"])
 
-# Sounding type and forecast hours
-sounding_type = st.selectbox("Sounding Type", ["Observed", "HRRR", "RAP"])
 if sounding_type != "Observed":
     forecast_hour = st.slider("Forecast Hour", 0, 18 if sounding_type == "HRRR" else 48, 0)
 else:
     forecast_hour = 0
 
-# Station and Radar selection
+# Station and radar
 selected_station = st.selectbox("Observed Station (Auto = nearest)", ["Auto"] + list(stations.keys()))
 selected_radar = st.selectbox("Radar Site (Auto = NWS default)", ["Auto"])
 
-# Run analysis button
+# Location auto-detect
+if use_auto:
+    lat, lon = get_location()
+    if lat is None:
+        st.warning("Auto-location failed — please enter manually.")
+        use_auto = False
+
+if not use_auto or lat is None:
+    col_lat, col_lon = st.columns(2)
+    lat = col_lat.number_input("Latitude", value=35.23, format="%.4f")
+    lon = col_lon.number_input("Longitude", value=-97.46, format="%.4f")
+
+# Run button
 if st.button("🚀 Run Analysis", type="primary"):
     if lat is None or lon is None:
         st.error("Valid coordinates required!")
     else:
-        # Find station code if needed
+        # Determine station code if needed
         station_code = None
         if sounding_type == "Observed":
             if selected_station == "Auto":
@@ -373,15 +420,13 @@ if st.button("🚀 Run Analysis", type="primary"):
             else:
                 station_code = selected_station
 
-        # Fetch sounding data
         df, station_label, _ = fetch_sounding(station_code, sounding_type, lat, lon, forecast_hour)
 
-        # Get NWS radar and forecast info
         radar_station, forecast_url = get_nws_data(lat, lon)
         if selected_radar != "Auto":
             radar_station = selected_radar
 
-        # Tabs for display
+        # Tabs
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Overview", "Parameters", "Skew-T", "Radar & Sat", "Alerts & MDs", "Forecast"])
 
         with tab1:
@@ -392,7 +437,7 @@ if st.button("🚀 Run Analysis", type="primary"):
                 p = analyze(df)
                 st.write(f"**Storm Mode:** {storm_mode(p)}")
                 st.write(f"**CRI Score:** {CRI(p)} / 10")
-                # Add your parameter display here
+                # You can add parameter summaries here
             else:
                 st.info("Run analysis to view parameters.")
 
@@ -405,10 +450,10 @@ if st.button("🚀 Run Analysis", type="primary"):
 
         with tab3:
             if df is not None:
-                # Plot skew-t
-                st.write("Skew-T plot placeholder.")
+                plot_skewt(df, station_label)
+                st.image("skewt_hodograph.png")
             else:
-                st.info("No sounding to plot.")
+                st.info("No sounding to display.")
 
         with tab4:
             if radar_station:
