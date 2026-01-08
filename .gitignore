@@ -1,3 +1,6 @@
-# IDE stuff
+# python venv
 .venv
+
+#jetbrains stuff
+.idea/
 *.iml
