@@ -176,7 +176,8 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
     else:
         model = 'hrrr' if sounding_type == "HRRR" else 'rap'
         try:
-            data = spy.get_model_data(model, [lat, lon], forecast_hour=forecast_hour)
+            # Remove forecast_hour, pass only model and location
+            data = spy.get_model_data(model, [lat, lon])
             df = pd.DataFrame({
                 'pressure': data['p'] * units.hPa,
                 'temperature': data['T'] * units.degC,
@@ -191,7 +192,6 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
         except Exception as e:
             st.error(f"Model error: {e}")
             return None, None, None
-
 # =========================
 # Analysis Function
 # =========================
