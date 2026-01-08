@@ -253,17 +253,17 @@ def analyze(df):
         dcape_val = np.nan
 
     try:
-        rm, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
-        rm_speed = float(mpcalc.wind_speed(rm[0], rm[1]).magnitude)
+        storm_motion, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
+        rm_speed = float(mpcalc.wind_speed(storm_motion[0], storm_motion[1]).magnitude)
     except:
         rm_speed = np.nan
 
     try:
-        srh_1 = float(mpcalc.storm_relative_helicity(z, u, v, depth=1*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude)
+        srh_1 = float(mpcalc.storm_relative_helicity(z, u, v, depth=1*units.km, storm_u=storm_motion[0], storm_v=storm_motion[1])[0].magnitude)
     except:
         srh_1 = np.nan
     try:
-        srh_3 = float(mpcalc.storm_relative_helicity(z, u, v, depth=3*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude)
+        srh_3 = float(mpcalc.storm_relative_helicity(z, u, v, depth=3*units.km, storm_u=storm_motion[0], storm_v=storm_motion[1])[0].magnitude)
     except:
         srh_3 = np.nan
     try:
@@ -321,10 +321,18 @@ def analyze(df):
         ehi = np.nan
 
     try:
-        storm_motion = mpcalc.bunkers_storm_motion(p, u, v, z)
+        storm_motion, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
         rm_speed = float(mpcalc.wind_speed(storm_motion[0], storm_motion[1]).magnitude)
     except:
         rm_speed = np.nan
+
+    # Fix for significant hail (SHIP)
+    try:
+        freezing_level = safe_float(mpcalc.freezing_level(z, T))
+        ship_param = mpcalc.significant_hail(mlcape, freezing_level * units('m'), T[p.argmin()], lr_700_500)
+        ship_value = safe_float(ship_param)
+    except:
+        ship_value = np.nan
 
     # Final parameter dictionary
     return {
@@ -353,12 +361,11 @@ def analyze(df):
         "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
         "EHI": ehi,
-        "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500)),
+        "SHIP": ship_value,
         "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
         "SCP": safe_float(mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff)),
         "RM_SPEED": rm_speed
     }
-
 def storm_mode(p):
     if p["MLCAPE"] < 250:
         return "Weak / Elevated"
