@@ -10,11 +10,11 @@ import metpy.calc as mpcalc
 import matplotlib.pyplot as plt
 from metpy.plots import SkewT, Hodograph
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import plyer
 import sounderpy as spy
+import plyer
 
 # =========================
-# Stations & Radars (your original list)
+# Full List of Stations & Radars
 # =========================
 stations = {
     'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82), 'AFC': (61.27, -149.99),
@@ -55,15 +55,13 @@ radars = {
     'KFDX': (34.63, -103.63), 'KFDR': (34.36, -98.98), 'KFFX': (43.44, -124.24), 'KFGF': (47.94, -97.18),
     'KFGZ': (35.23, -111.82), 'KFWS': (32.57, -97.30), 'KFXA': (41.02, -92.33), 'KFXC': (34.91, -106.61),
     'KGGW': (48.21, -106.63), 'KGJX': (39.06, -108.13), 'KGLD': (39.07, -101.70), 'KGSP': (34.88, -82.22),
-    'KGWX': (32.67, -90.90), 'KGYX': (43.89, -70.26), 'KHDX': (33.08, -106.12), 'KHGX': (29.47, -95.08),
-    'KHNX': (36.31, -119.63), 'KHPX': (36.74, -87.29), 'KHTX': (34.93, -86.08), 'KICT': (37.65, -97.44),
 }
 
 # =========================
-# Utility Functions
+# Utility functions
 # =========================
 def safe_float(val):
-    """Safely convert a masked array or value to float."""
+    """Safely convert masked array or value to float."""
     if val is None:
         return np.nan
     if np.ma.is_masked(val):
@@ -77,6 +75,7 @@ def get_utc_now():
     return datetime.datetime.now(datetime.timezone.utc)
 
 def get_location():
+    """Auto-detect location via IP."""
     try:
         resp = requests.get('https://ipinfo.io/json', timeout=5)
         data = resp.json()
@@ -87,6 +86,7 @@ def get_location():
         return None, None
 
 def haversine(lat1, lon1, lat2, lon2):
+    """Calculate distance between two lat/lon points."""
     R = 6371.0
     dlat = np.radians(lat2 - lat1)
     dlon = np.radians(lon2 - lon1)
@@ -95,6 +95,7 @@ def haversine(lat1, lon1, lat2, lon2):
     return R * c
 
 def get_spc_risk(lat, lon):
+    """Get SPC outlook risk level."""
     url = "https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query"
     params = {"where": "1=1", "outFields": "*", "f": "geojson", "outSR": "4326"}
     try:
@@ -121,6 +122,7 @@ def get_spc_risk(lat, lon):
 # NWS data functions
 # =========================
 def get_nws_data(lat, lon):
+    """Get NWS radar station and forecast URL."""
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
     points_url = f"https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
     try:
@@ -130,6 +132,7 @@ def get_nws_data(lat, lon):
         return None, None
 
 def get_alerts(lat, lon):
+    """Get current active weather alerts."""
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
     alerts_url = f"https://api.weather.gov/alerts/active?point={lat:.4f},{lon:.4f}"
     try:
@@ -141,6 +144,7 @@ def get_alerts(lat, lon):
         return []
 
 def get_forecast(forecast_url):
+    """Get forecast periods."""
     if not forecast_url:
         return []
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
@@ -151,6 +155,7 @@ def get_forecast(forecast_url):
         return []
 
 def get_mesoscale_discussions():
+    """Get latest mesoscale discussions from SPC."""
     url = "https://www.spc.noaa.gov/products/md/"
     try:
         resp = requests.get(url, timeout=10).text
@@ -163,6 +168,7 @@ def get_mesoscale_discussions():
 # Fetch sounding with sounderpy
 # =========================
 def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=None, forecast_hour=0):
+    """Get sounding data either observed or model."""
     now = get_utc_now()
 
     if sounding_type == "Observed":
@@ -185,6 +191,7 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
         st.warning("No recent observed sounding available.")
         return None, None, None
     else:
+        # For forecast data
         model = 'hrrr' if sounding_type == "HRRR" else 'rap'
         try:
             data = spy.get_model_data(model, [lat, lon], forecast_hour=forecast_hour)
@@ -204,9 +211,10 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
             return None, None, None
 
 # =========================
-# Analysis function
+# Analyze function (calculate storm parameters)
 # =========================
 def analyze(df):
+    """Calculate storm parameters from sounding data."""
     p = df['pressure'].values * units.hPa
     T = df['temperature'].values * units.degC
     Td = df['dewpoint'].values * units.degC
@@ -219,7 +227,7 @@ def analyze(df):
     mucape, mucin = mpcalc.most_unstable_cape_cin(p, T, Td)
     sbcape, sbcin = mpcalc.surface_based_cape_cin(p, T, Td)
 
-    # LCL and LFC
+    # LCL, LFC, EL
     lcl_p, _ = mpcalc.lcl(p[0], T[0], Td[0])
     lcl_z = mpcalc.pressure_to_height_std(lcl_p)
     lfc_p, _ = mpcalc.lfc(p, T, Td)
@@ -277,7 +285,7 @@ def analyze(df):
     wind_speed = mpcalc.wind_speed(u, v).to('knots')
     wind_dir = mpcalc.wind_direction(u, v)
 
-    # Wrap with safe_float
+    # safe_float helper
     def safe_float(val):
         if np.ma.is_masked(val):
             return np.nan
@@ -286,16 +294,19 @@ def analyze(df):
         except:
             return np.nan
 
+    # Calculate EHI manually: EHI = CAPE * helicity / 1000
+    ehi = safe_float(mlcape * srh_3 / 1000)
+
     return {
-        "SBCAPE": float(sbcape.magnitude),
-        "SBCIN": float(sbcin.magnitude),
-        "MLCAPE": float(mlcape.magnitude),
-        "MLCIN": float(mlcin.magnitude),
-        "MUCAPE": float(mucape.magnitude),
-        "MUCIN": float(mucin.magnitude),
-        "LCL": float(lcl_z.magnitude),
-        "LFC": float(lfc_p.magnitude) if lfc_p is not None else np.nan,
-        "EL": float(el_p.magnitude) if el_p is not None else np.nan,
+        "SBCAPE": float(sbcape),
+        "SBCIN": float(sbcin),
+        "MLCAPE": float(mlcape),
+        "MLCIN": float(mlcin),
+        "MUCAPE": float(mucape),
+        "MUCIN": float(mucin),
+        "LCL": float(lcl_z),
+        "LFC": float(lfc_p) if lfc_p is not None else np.nan,
+        "EL": float(el_p) if el_p is not None else np.nan,
         "DCAPE": dcape_val,
         "LR_0_3": float(lr_0_3) if not np.isnan(lr_0_3) else np.nan,
         "LR_700_500": float(lr_700_500) if not np.isnan(lr_700_500) else np.nan,
@@ -311,7 +322,7 @@ def analyze(df):
         "TT_INDEX": safe_float(mpcalc.total_totals_index(p, T, Td)),
         "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
-        "EHI": safe_float(mpcalc.energy_helicity_index(mlcape, srh_3)),
+        "EHI": safe_float(mlcape * srh_3 / 1000),
         "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500)),
         "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
         "SCP": safe_float(mpcalc.supercell_composite(mucape, float(rm_speed), srh_eff)),
@@ -319,7 +330,7 @@ def analyze(df):
     }
 
 # =========================
-# Storm mode & CRI calculation
+# storm_mode() function
 # =========================
 def storm_mode(p):
     if p["MLCAPE"] < 250:
@@ -332,16 +343,11 @@ def storm_mode(p):
         return "Linear / Embedded Supercells"
     return "Pulse / Multicell"
 
-def CRI(p):
-    score = min(p["MLCAPE"]/1000, 3) + min(p["SHEAR_6"]/20, 3) + min(p["SRH_1"]/150, 3)
-    if p["DCAPE"] > 1000:
-        score += 1
-    return round(score, 1)
-
 # =========================
-# Plot skewt function
+# plot_skewt() function
 # =========================
 def plot_skewt(df, station):
+    """Create a skew-T plot with wind hodograph inset."""
     fig = plt.figure(figsize=(12, 12))
     skew = SkewT(fig, rotation=45)
     skew.plot(df.pressure, df.temperature, 'r', linewidth=2, label='Temperature')
@@ -351,10 +357,12 @@ def plot_skewt(df, station):
     skew.ax.set_xlim(-50, 50)
     skew.ax.legend(loc='upper left')
 
+    # Hodograph inset
     ax_hod = inset_axes(skew.ax, '40%', '40%', loc='upper right')
     h = Hodograph(ax_hod, component_range=80)
     h.add_grid(increment=20)
 
+    # Plot wind vectors
     try:
         u_mag = df.u_wind.magnitude
         v_mag = df.v_wind.magnitude
@@ -411,7 +419,7 @@ if st.button("🚀 Run Analysis", type="primary"):
     if lat is None or lon is None:
         st.error("Valid coordinates required!")
     else:
-        # Determine station code if needed
+        # Find station code if needed
         station_code = None
         if sounding_type == "Observed":
             if selected_station == "Auto":
@@ -426,7 +434,7 @@ if st.button("🚀 Run Analysis", type="primary"):
         if selected_radar != "Auto":
             radar_station = selected_radar
 
-        # Tabs
+        # Tabs for display
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Overview", "Parameters", "Skew-T", "Radar & Sat", "Alerts & MDs", "Forecast"])
 
         with tab1:
@@ -437,7 +445,6 @@ if st.button("🚀 Run Analysis", type="primary"):
                 p = analyze(df)
                 st.write(f"**Storm Mode:** {storm_mode(p)}")
                 st.write(f"**CRI Score:** {CRI(p)} / 10")
-                # You can add parameter summaries here
             else:
                 st.info("Run analysis to view parameters.")
 
