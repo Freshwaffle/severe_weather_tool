@@ -216,7 +216,7 @@ def analyze(df):
     z = df['height'].values * units.meter
 
     def safe_float(val):
-        """Convert quantities, arrays, or floats to float."""
+        """Safely convert quantities, arrays, or floats to float."""
         if val is None:
             return np.nan
         if hasattr(val, 'magnitude'):
@@ -231,16 +231,23 @@ def analyze(df):
         except:
             return np.nan
 
-    # Custom function for hail potential (since mpcalc.significant_hail doesn't exist)
+    # Custom function to estimate freezing level height in meters
+    def freezing_level(z, T):
+        T_vals = T.magnitude
+        z_vals = z.magnitude
+        for i in range(len(T_vals) - 1):
+            if T_vals[i] >= 0 and T_vals[i + 1] <= 0:
+                frac = (0 - T_vals[i]) / (T_vals[i + 1] - T_vals[i])
+                height = z_vals[i] + frac * (z_vals[i + 1] - z_vals[i])
+                return height * units.meter
+        return None
+
+    # Custom heuristic for significant hail potential
     def significant_hail(cape, freezing_level, surface_temp, lapse_rate):
-        """
-        Approximate significant hail potential.
-        """
         score = 0
         cape_val = safe_float(cape)
         fz_m = safe_float(freezing_level)
         lapse = safe_float(lapse_rate)
-
         if cape_val > 1000:
             score += 1
         if fz_m is not None and fz_m < 2000:
@@ -319,7 +326,10 @@ def analyze(df):
     # Calculate EHI
     ehi = safe_float((mlcape_value * srh_3_value) / 1000)
 
-    # Final dictionary
+    # Calculate the hail potential score using custom heuristic
+    hail_score = significant_hail(mlcape, freezing_level(z, T), T[p.argmin()], safe_float(lr_700_500))
+
+    # Return all parameters
     return {
         "SBCAPE": safe_float(sbcape),
         "SBCIN": safe_float(sbcin),
@@ -346,7 +356,7 @@ def analyze(df):
         "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
         "EHI": ehi,
-        "SHIP": significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], safe_float(lr_700_500)),
+        "SHIP": hail_score,
         "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, safe_float(lcl_z), mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
         "SCP": safe_float(mpcalc.supercell_composite(mucape, safe_float(rm_speed), srh_eff)),
         "RM_SPEED": safe_float(mpcalc.wind_speed(u, v))
