@@ -7,17 +7,12 @@ from shapely.geometry import shape, Point
 from siphon.simplewebservice.wyoming import WyomingUpperAir
 from metpy.units import units
 import metpy.calc as mpcalc
-import matplotlib.pyplot as plt
-from metpy.plots import SkewT, Hodograph
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import plyer
 import sounderpy as spy
 
 # =========================
 # Utility Functions
 # =========================
 def safe_float(val):
-    """Safely convert a masked array or value to a float, returning NaN if invalid."""
     if val is None:
         return np.nan
     if np.ma.is_masked(val):
@@ -27,35 +22,6 @@ def safe_float(val):
     except:
         return np.nan
 
-def storm_mode(p):
-    """Determine storm mode based on analyzed parameters."""
-    if p["MLCAPE"] < 250:
-        return "Weak / Elevated"
-    if p["SHEAR_6"] > 40 and p["SRH_1"] > 150:
-        return "Discrete Supercells"
-    if p["SHEAR_6"] > 35 and p["DCAPE"] > 1000:
-        return "QLCS / Potential Derecho"
-    if p["SHEAR_6"] > 30:
-        return "Linear / Embedded Supercells"
-    return "Pulse / Multicell"
-
-# =========================
-# Stations & Radars
-# =========================
-stations = {
-    # ... your full stations dictionary ...
-    'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82),
-    # add the rest...
-}
-radars = {
-    # ... your full radars dictionary ...
-    'KABR': (45.45, -98.41), 'KABX': (35.15, -106.82),
-    # add the rest...
-}
-
-# =========================
-# Location & Data Fetching Functions
-# =========================
 def get_utc_now():
     return datetime.datetime.now(datetime.timezone.utc)
 
@@ -101,9 +67,6 @@ def get_spc_risk(lat, lon):
     found.sort(key=lambda x: hierarchy.index(x))
     return found[-1]
 
-# =========================
-# NWS Data Functions
-# =========================
 def get_nws_data(lat, lon):
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
     points_url = f"https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
@@ -138,18 +101,6 @@ def get_forecast(forecast_url):
         st.error(f"Forecast error: {e}")
         return []
 
-def get_mesoscale_discussions():
-    url = "https://www.spc.noaa.gov/products/md/"
-    try:
-        resp = requests.get(url, timeout=10).text
-        mds = [line.strip() for line in resp.splitlines() if "Mesoscale Discussion" in line][:5]
-        return mds or ["No current Mesoscale Discussions."]
-    except:
-        return ["Unable to load MDs."]
-
-# =========================
-# Sounding Data Fetching
-# =========================
 def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=None, forecast_hour=0):
     now = get_utc_now()
 
@@ -172,19 +123,30 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
                 continue
         st.warning("No recent observed sounding available.")
         return None, None, None
-
     else:
         # Use correct model names supported by sounderpy
         model = 'rap-ruc' if sounding_type == "HRRR" else 'ncep'
-
         forecast_time = now + datetime.timedelta(hours=forecast_hour)
+
+        # NOAA data is generally available for recent hours only (e.g., last 48 hours)
+        max_hours = 48
+        earliest_time = now - datetime.timedelta(hours=max_hours)
+
+        # Check if forecast_time is within available data window
+        if forecast_time > now:
+            st.error("Forecast time is in the future. Please select a more recent forecast.")
+            return None, None, None
+        if forecast_time < earliest_time:
+            st.error(f"Forecast time {forecast_time} is too far in the past. Data available for last {max_hours} hours.")
+            return None, None, None
+
+        # Extract date parts
         year = forecast_time.year
         month = forecast_time.month
         day = forecast_time.day
         hour = forecast_time.hour
 
         try:
-            # Pass explicit date/time parameters
             data = spy.get_model_data(model, [lat, lon], year=year, month=month, day=day, hour=hour)
             df = pd.DataFrame({
                 'pressure': data['p'] * units.hPa,
@@ -394,7 +356,7 @@ if not use_auto:
 # Sounding type selection
 sounding_type = st.selectbox("Sounding Type", ["Observed", "HRRR", "RAP"])
 if sounding_type != "Observed":
-    forecast_hour = st.slider("Forecast Hour", 0, 18 if sounding_type == "HRRR" else 48, 0)
+    forecast_hour = st.slider("Forecast Hour", 0, 48, 0)
 else:
     forecast_hour = 0
 
@@ -435,30 +397,16 @@ if st.button("🚀 Run Analysis", type="primary"):
             st.image("https://www.spc.noaa.gov/products/outlook/day1otlk.gif")
             if df is not None:
                 p = analyze(df)
-                st.write(f"**Storm Mode:** {storm_mode(p)}")
-                # Note: `CRI(p)` function is used but not defined in provided code. Ensure to define or remove.
-                # For now, comment or remove the line:
+                # Placeholder for CRI function not provided
                 # st.write(f"**CRI Score:** {CRI(p)} / 10")
-                # Also, ensure to define CRI() if needed.
-                # Example placeholder:
-                # def CRI(p): return 7  # Placeholder
-                # Then uncomment the line above.
-
-                # For now, comment the CRI line to avoid error.
-                # Key parameters display
+                # Display key parameters
                 key_df = pd.DataFrame({
                     "Parameter": ["MLCAPE", "SRH 0-1km", "Shear 0-6km", "DCAPE", "EHI", "SHIP", "STP", "SCP"],
                     "Value": [p[k] for k in ["MLCAPE", "SRH_1", "SHEAR_6", "DCAPE", "EHI", "SHIP", "STP", "SCP"]],
                     "Units": ["J/kg", "m²/s²", "kt", "J/kg", "", "", "", ""]
                 }).round(1)
                 st.table(key_df)
-                # Example CRI usage (remove if undefined):
-                # if CRI(p) >= 6 or risk in ["ENH", "MDT", "HIGH"]:
-                #     st.error("⚠️ Elevated severe weather risk — stay alert!")
-                #     try:
-                #         plyer.notification.notify(title="Severe Weather", message=f"{risk} | CRI {CRI(p)}", timeout=10)
-                #     except:
-                #         pass
+                # Optional: add CRI and alerts if you implement them
 
         with tab2:
             st.subheader("🔍 Detailed Parameter Breakdown")
@@ -491,16 +439,14 @@ if st.button("🚀 Run Analysis", type="primary"):
 
                 styled = df_params.style.apply(lambda row: [get_color(row['Parameter'], row['Value']) if i == 1 else '' for i in range(len(row))], axis=1)
                 st.dataframe(styled, width='stretch')
-
             else:
                 st.info("Run analysis to view detailed parameters.")
 
         with tab3:
             if df is not None:
-                # plot_skewt() should be defined; assume it's implemented
+                # plot_skewt() should be implemented
                 # plot_skewt(df, station_label)
-                # Remove the placeholder for plot_skewt if not defined
-                # For now, display a message
+                # For now, show info
                 st.info("Skew-T plotting not implemented in this snippet.")
             else:
                 st.info("No sounding to display.")
@@ -508,7 +454,6 @@ if st.button("🚀 Run Analysis", type="primary"):
         with tab4:
             if radar_station:
                 st.image(f"https://radar.weather.gov/ridge/standard/{radar_station}_loop.gif", caption=f"{radar_station} Radar")
-            # GOES-19 GeoColor
             st.image("https://cdn.star.nesdis.noaa.gov/GOES19/ABI/CONUS/GEOCOLOR/GOES19-CONUS-GEOCOLOR-625x375.gif", caption="GOES-19 GeoColor")
 
         with tab5:
