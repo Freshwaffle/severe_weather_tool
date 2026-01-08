@@ -287,8 +287,12 @@ def analyze(df):
         except:
             return np.nan
 
-    # Calculate EHI manually: CAPE * helicity / 1000 (using magnitudes)
-    ehi = safe_float((mlcape.magnitude * srh_3.magnitude) / 1000)
+    # Handle both float and Pint Quantity for CAPE and SRH
+    mlcape_value = mlcape.magnitude if hasattr(mlcape, 'magnitude') else mlcape
+    srh_3_value = srh_3.magnitude if hasattr(srh_3, 'magnitude') else srh_3
+
+    # Calculate EHI manually: CAPE * helicity / 1000
+    ehi = safe_float((mlcape_value * srh_3_value) / 1000)
 
     return {
         "SBCAPE": float(sbcape),
@@ -315,7 +319,7 @@ def analyze(df):
         "TT_INDEX": safe_float(mpcalc.total_totals_index(p, T, Td)),
         "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
-        "EHI": safe_float((mlcape.magnitude * srh_3.magnitude) / 1000),  # manually computed
+        "EHI": ehi,  # already computed as float
         "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500)),
         "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
         "SCP": safe_float(mpcalc.supercell_composite(mucape, float(rm_speed), srh_eff)),
