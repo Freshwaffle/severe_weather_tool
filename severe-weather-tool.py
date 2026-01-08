@@ -3,7 +3,7 @@ import datetime
 import requests
 import pandas as pd
 import numpy as np
-import shapely.geometry as geometry
+from shapely.geometry import shape, Point
 from siphon.simplewebservice.wyoming import WyomingUpperAir
 from metpy.units import units
 import metpy.calc as mpcalc
@@ -14,7 +14,7 @@ import plyer
 import sounderpy as spy
 
 # =========================
-# Stations & Radars (full lists from your repo)
+# Stations & Radars
 # =========================
 stations = {
     'ABQ': (35.04, -106.60), 'ABR': (45.45, -98.40), 'ABX': (35.15, -106.82), 'AFC': (61.27, -149.99),
@@ -79,7 +79,9 @@ radars = {
     'KVNX': (36.74, -98.13), 'KVTX': (34.41, -119.18), 'KVWX': (37.59, -87.72), 'KYUX': (43.89, -75.03),
 }
 
+# =========================
 # Utility Functions
+# =========================
 def get_utc_now():
     return datetime.datetime.now(datetime.timezone.utc)
 
@@ -109,7 +111,7 @@ def get_spc_risk(lat, lon):
     except:
         return "Error fetching SPC outlook"
 
-    pt = geometry.Point(lon, lat)
+    pt = Point(lon, lat)
     hierarchy = ["TSTM", "MRGL", "SLGT", "ENH", "MDT", "HIGH"]
     found = []
     for f in data.get("features", []):
@@ -125,7 +127,9 @@ def get_spc_risk(lat, lon):
     found.sort(key=lambda x: hierarchy.index(x))
     return found[-1]
 
+# =========================
 # NWS API Functions
+# =========================
 def get_nws_data(lat, lon):
     headers = {"User-Agent": "(severeweatherinterface.com, contact@example.com)"}
     points_url = f"https://api.weather.gov/points/{lat:.4f},{lon:.4f}"
@@ -169,7 +173,9 @@ def get_mesoscale_discussions():
     except:
         return ["Unable to load MDs."]
 
+# =========================
 # Sounding Fetching
+# =========================
 def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=None, forecast_hour=0):
     now = get_utc_now()
 
@@ -212,7 +218,9 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
             st.error(f"Model error: {e}")
             return None, None, None
 
-# Analysis
+# =========================
+# Analysis (safe for masked values)
+# =========================
 def analyze(df):
     p = df['pressure'].values * units.hPa
     T = df['temperature'].values * units.degC
@@ -365,7 +373,9 @@ def plot_skewt(df, station):
     plt.savefig('skewt_hodograph.png', dpi=150, bbox_inches='tight')
     plt.close()
 
+# =========================
 # Streamlit App
+# =========================
 st.set_page_config(page_title="Severe Weather Tool", layout="wide")
 st.title("🌪️ Enhanced Severe Weather Interface")
 
@@ -555,5 +565,3 @@ if st.button("🚀 Run Analysis", type="primary"):
                 st.write(f"**{p['name']}**: {p['detailedForecast']}")
 
 st.caption("Unofficial tool • Data: NWS, SPC, Wyoming, SounderPy • Built for storm season 2026")
-</parameter>
-</xai:function_call>
