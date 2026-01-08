@@ -216,11 +216,20 @@ def analyze(df):
     z = df['height'].values * units.meter
 
     def safe_float(val):
-        """Safely convert Pint quantities or floats to float."""
+        """Convert quantities, arrays, or floats to float."""
+        if val is None:
+            return np.nan
         if hasattr(val, 'magnitude'):
-            return float(val.magnitude)
-        else:
+            val = val.magnitude
+        if isinstance(val, np.ndarray):
+            if val.size == 1:
+                val = val.item()
+            else:
+                return np.nan
+        try:
             return float(val)
+        except:
+            return np.nan
 
     # Calculate CAPE and CIN
     mlcape, mlcin = mpcalc.mixed_layer_cape_cin(p, T, Td)
@@ -285,14 +294,14 @@ def analyze(df):
     wind_speed = mpcalc.wind_speed(u, v).to('knots')
     wind_dir = mpcalc.wind_direction(u, v)
 
-    # Handle both float and Pint Quantity for CAPE and SRH
+    # Scalars for array outputs
     mlcape_value = mlcape.magnitude if hasattr(mlcape, 'magnitude') else mlcape
     srh_3_value = srh_3.magnitude if hasattr(srh_3, 'magnitude') else srh_3
 
-    # Calculate EHI manually: CAPE * helicity / 1000
+    # Calculate EHI
     ehi = safe_float((mlcape_value * srh_3_value) / 1000)
 
-    # Return all parameters
+    # Return dictionary with all parameters
     return {
         "SBCAPE": safe_float(sbcape),
         "SBCIN": safe_float(sbcin),
