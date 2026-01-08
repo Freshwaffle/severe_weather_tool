@@ -175,9 +175,14 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
 
     else:
         model = 'hrrr' if sounding_type == "HRRR" else 'rap'
+        forecast_time = now + datetime.timedelta(hours=forecast_hour)
+        year = forecast_time.year
+        month = forecast_time.month
+        day = forecast_time.day
+        hour = forecast_time.hour
         try:
-            # Remove forecast_hour, pass only model and location
-            data = spy.get_model_data(model, [lat, lon])
+            # Pass year, month, day, hour explicitly
+            data = spy.get_model_data(model, [lat, lon], year=year, month=month, day=day, hour=hour)
             df = pd.DataFrame({
                 'pressure': data['p'] * units.hPa,
                 'temperature': data['T'] * units.degC,
@@ -186,9 +191,8 @@ def fetch_sounding(station_code=None, sounding_type="Observed", lat=None, lon=No
                 'v_wind': data['v'] * units.knots,
                 'height': data['z'] * units.meter
             })
-            valid_time = now + datetime.timedelta(hours=forecast_hour)
-            st.write(f"Using **{sounding_type}** forecast (+{forecast_hour}h) valid {valid_time:%Y-%m-%d %HZ}")
-            return df, f"{sounding_type} +{forecast_hour}h", valid_time
+            st.write(f"Using **{sounding_type}** forecast (+{forecast_hour}h) valid {forecast_time:%Y-%m-%d %HZ}")
+            return df, f"{sounding_type} +{forecast_hour}h", forecast_time
         except Exception as e:
             st.error(f"Model error: {e}")
             return None, None, None
