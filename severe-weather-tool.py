@@ -229,14 +229,18 @@ def analyze(df):
     v = (df['v_wind'].values * units.knots).to('m/s')
     z = df['height'].values * units.meter
 
+    # Calculate CAPE and CIN
     mlcape, mlcin = mpcalc.mixed_layer_cape_cin(p, T, Td)
     mucape, mucin = mpcalc.most_unstable_cape_cin(p, T, Td)
     sbcape, sbcin = mpcalc.surface_based_cape_cin(p, T, Td)
+
+    # LCL and LFC
     lcl_p, _ = mpcalc.lcl(p[0], T[0], Td[0])
     lcl_z = mpcalc.pressure_to_height_std(lcl_p)
     lfc_p, _ = mpcalc.lfc(p, T, Td)
     el_p, _ = mpcalc.el(p, T, Td)
 
+    # Lapse rates
     def lapse(z_slice, T_slice):
         dz = np.diff(z_slice.magnitude)
         dT = np.diff(T_slice.magnitude)
@@ -247,15 +251,18 @@ def analyze(df):
     lr_700_500 = lapse(z[(p <= 700*units.hPa) & (p >= 500*units.hPa)], T[(p <= 700*units.hPa) & (p >= 500*units.hPa)])
     lr_850_500 = lapse(z[(p <= 850*units.hPa) & (p >= 500*units.hPa)], T[(p <= 850*units.hPa) & (p >= 500*units.hPa)])
 
+    # Downward CAPE
     try:
         dcape_val = float(mpcalc.downdraft_cape(p, T, Td).magnitude)
     except:
         dcape_val = np.nan
 
+    # Storm motion and storm-relative helicity
     try:
         storm_motion, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
         rm_speed = float(mpcalc.wind_speed(storm_motion[0], storm_motion[1]).magnitude)
     except:
+        storm_motion = (np.nan, np.nan)
         rm_speed = np.nan
 
     try:
@@ -271,27 +278,26 @@ def analyze(df):
     except:
         srh_eff = np.nan
 
+    # Shear magnitudes
     try:
-        shear_1_mag = float(mpcalc.bulk_shear(p, u, v, height=z, depth=1*units.km)[0].magnitude)
+        shear_1 = mpcalc.bulk_shear(p, u, v, height=z, depth=1*units.km)
+        shear_1_mag = safe_float(shear_1)
     except:
         shear_1_mag = np.nan
+
     try:
-        shear_3_mag = float(mpcalc.bulk_shear(p, u, v, height=z, depth=3*units.km)[0].magnitude)
+        shear_3 = mpcalc.bulk_shear(p, u, v, height=z, depth=3*units.km)
+        shear_3_mag = safe_float(shear_3)
     except:
         shear_3_mag = np.nan
+
     try:
-        shear_6_mag = float(mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)[0].magnitude)
+        shear_6 = mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)
+        shear_6_mag = safe_float(shear_6)
     except:
         shear_6_mag = np.nan
 
-    def safe_float(val):
-        if np.ma.is_masked(val):
-            return np.nan
-        try:
-            return float(val.magnitude if hasattr(val, 'magnitude') else val)
-        except:
-            return np.nan
-
+    # Wind parameters
     wind_speed = mpcalc.wind_speed(u, v).to('knots')
     wind_dir = mpcalc.wind_direction(u, v)
 
@@ -313,26 +319,40 @@ def analyze(df):
     shear_3_mag = safe_float(shear_3_mag)
     shear_6_mag = safe_float(shear_6_mag)
 
-    # Now call the mpcalc functions safely
+    # Calculate EHI
     try:
         ehi = mpcalc.energy_helicity_index(mlcape * units('J/kg'), srh_3 * units('m^2/s^2'))
         ehi = safe_float(ehi)
     except:
         ehi = np.nan
 
+    # Storm motion and shear magnitude
     try:
         storm_motion, _, _ = mpcalc.bunkers_storm_motion(p, u, v, z)
         rm_speed = float(mpcalc.wind_speed(storm_motion[0], storm_motion[1]).magnitude)
     except:
         rm_speed = np.nan
 
-    # Fix for significant hail (SHIP)
+    # Significant Hail Parameter (SHIP)
     try:
         freezing_level = safe_float(mpcalc.freezing_level(z, T))
         ship_param = mpcalc.significant_hail(mlcape, freezing_level * units('m'), T[p.argmin()], lr_700_500)
         ship_value = safe_float(ship_param)
     except:
         ship_value = np.nan
+
+    # Supercell and tornado indices
+    try:
+        sbc = mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))
+        sbc = safe_float(sbc)
+    except:
+        sbc = np.nan
+
+    try:
+        scp = mpcalc.supercell_composite(mucape, rm_speed * units('m/s'), srh_eff)
+        scp = safe_float(scp)
+    except:
+        scp = np.nan
 
     # Final parameter dictionary
     return {
@@ -362,8 +382,8 @@ def analyze(df):
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
         "EHI": ehi,
         "SHIP": ship_value,
-        "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
-        "SCP": safe_float(mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff)),
+        "STP": sbc,
+        "SCP": scp,
         "RM_SPEED": rm_speed
     }
 def storm_mode(p):
