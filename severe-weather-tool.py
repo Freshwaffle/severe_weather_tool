@@ -260,17 +260,29 @@ def analyze(df):
 
     try:
         srh_1 = float(mpcalc.storm_relative_helicity(z, u, v, depth=1*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude)
+    except:
+        srh_1 = np.nan
+    try:
         srh_3 = float(mpcalc.storm_relative_helicity(z, u, v, depth=3*units.km, storm_u=rm[0], storm_v=rm[1])[0].magnitude)
+    except:
+        srh_3 = np.nan
+    try:
         srh_eff = float(mpcalc.storm_relative_helicity(z, u, v, depth=mpcalc.effective_layer(p, T, Td, z)[0])[0].magnitude)
     except:
-        srh_1 = srh_3 = srh_eff = np.nan
+        srh_eff = np.nan
 
     try:
         shear_1_mag = float(mpcalc.bulk_shear(p, u, v, height=z, depth=1*units.km)[0].magnitude)
+    except:
+        shear_1_mag = np.nan
+    try:
         shear_3_mag = float(mpcalc.bulk_shear(p, u, v, height=z, depth=3*units.km)[0].magnitude)
+    except:
+        shear_3_mag = np.nan
+    try:
         shear_6_mag = float(mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)[0].magnitude)
     except:
-        shear_1_mag = shear_3_mag = shear_6_mag = np.nan
+        shear_6_mag = np.nan
 
     def safe_float(val):
         if np.ma.is_masked(val):
@@ -283,27 +295,48 @@ def analyze(df):
     wind_speed = mpcalc.wind_speed(u, v).to('knots')
     wind_dir = mpcalc.wind_direction(u, v)
 
-    sweat = safe_float(mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir))
-    k_index = safe_float(mpcalc.k_index(p, T, Td))
-    tt_index = safe_float(mpcalc.total_totals_index(p, T, Td))
-    showalter = safe_float(mpcalc.showalter_index(p, T, Td))
-    lifted_index = safe_float(mpcalc.lifted_index(p, T, Td))
+    # Wrap all mpcalc functions with safe_float
+    mlcape = safe_float(mlcape)
+    mlcin = safe_float(mlcin)
+    mucape = safe_float(mucape)
+    mucin = safe_float(mucin)
+    sbcape = safe_float(sbcape)
+    sbcin = safe_float(sbcin)
+    lcl_z = safe_float(lcl_z)
+    lfc_p = safe_float(lfc_p)
+    el_p = safe_float(el_p)
+    dcape_val = safe_float(dcape_val)
+    srh_1 = safe_float(srh_1)
+    srh_3 = safe_float(srh_3)
+    srh_eff = safe_float(srh_eff)
+    shear_1_mag = safe_float(shear_1_mag)
+    shear_3_mag = safe_float(shear_3_mag)
+    shear_6_mag = safe_float(shear_6_mag)
 
-    ehi = safe_float(mpcalc.energy_helicity_index(mlcape, srh_3))
-    ship = safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500))
-    stp = safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km)))
-    scp = safe_float(mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff))
+    # Now call the mpcalc functions safely
+    try:
+        ehi = mpcalc.energy_helicity_index(mlcape * units('J/kg'), srh_3 * units('m^2/s^2'))
+        ehi = safe_float(ehi)
+    except:
+        ehi = np.nan
 
+    try:
+        storm_motion = mpcalc.bunkers_storm_motion(p, u, v, z)
+        rm_speed = float(mpcalc.wind_speed(storm_motion[0], storm_motion[1]).magnitude)
+    except:
+        rm_speed = np.nan
+
+    # Final parameter dictionary
     return {
-        "SBCAPE": float(sbcape.magnitude),
-        "SBCIN": float(sbcin.magnitude),
-        "MLCAPE": float(mlcape.magnitude),
-        "MLCIN": float(mlcin.magnitude),
-        "MUCAPE": float(mucape.magnitude),
-        "MUCIN": float(mucin.magnitude),
-        "LCL": float(lcl_z.magnitude),
-        "LFC": float(lfc_p.magnitude) if lfc_p is not None else np.nan,
-        "EL": float(el_p.magnitude) if el_p is not None else np.nan,
+        "SBCAPE": float(sbcape),
+        "SBCIN": float(sbcin),
+        "MLCAPE": float(mlcape),
+        "MLCIN": float(mlcin),
+        "MUCAPE": float(mucape),
+        "MUCIN": float(mucin),
+        "LCL": float(lcl_z),
+        "LFC": float(lfc_p) if lfc_p is not None else np.nan,
+        "EL": float(el_p) if el_p is not None else np.nan,
         "DCAPE": dcape_val,
         "LR_0_3": float(lr_0_3) if not np.isnan(lr_0_3) else np.nan,
         "LR_700_500": float(lr_700_500) if not np.isnan(lr_700_500) else np.nan,
@@ -314,15 +347,15 @@ def analyze(df):
         "SHEAR_1": shear_1_mag,
         "SHEAR_3": shear_3_mag,
         "SHEAR_6": shear_6_mag,
-        "SWEAT": sweat,
-        "K_INDEX": k_index,
-        "TT_INDEX": tt_index,
-        "SHOWALTER": showalter,
-        "LIFTED_INDEX": lifted_index,
+        "SWEAT": safe_float(mpcalc.sweat_index(p, T, Td, wind_speed, wind_dir)),
+        "K_INDEX": safe_float(mpcalc.k_index(p, T, Td)),
+        "TT_INDEX": safe_float(mpcalc.total_totals_index(p, T, Td)),
+        "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
+        "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
         "EHI": ehi,
-        "SHIP": ship,
-        "STP": stp,
-        "SCP": scp,
+        "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], lr_700_500)),
+        "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, lcl_z, mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
+        "SCP": safe_float(mpcalc.supercell_composite(mucape, rm_speed*units('m/s'), srh_eff)),
         "RM_SPEED": rm_speed
     }
 
