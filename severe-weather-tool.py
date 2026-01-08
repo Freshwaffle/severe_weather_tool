@@ -231,6 +231,24 @@ def analyze(df):
         except:
             return np.nan
 
+    # Custom function for hail potential (since mpcalc.significant_hail doesn't exist)
+    def significant_hail(cape, freezing_level, surface_temp, lapse_rate):
+        """
+        Approximate significant hail potential.
+        """
+        score = 0
+        cape_val = safe_float(cape)
+        fz_m = safe_float(freezing_level)
+        lapse = safe_float(lapse_rate)
+
+        if cape_val > 1000:
+            score += 1
+        if fz_m is not None and fz_m < 2000:
+            score += 1
+        if lapse is not None and lapse > 6:
+            score += 1
+        return score
+
     # Calculate CAPE and CIN
     mlcape, mlcin = mpcalc.mixed_layer_cape_cin(p, T, Td)
     mucape, mucin = mpcalc.most_unstable_cape_cin(p, T, Td)
@@ -301,7 +319,7 @@ def analyze(df):
     # Calculate EHI
     ehi = safe_float((mlcape_value * srh_3_value) / 1000)
 
-    # Return dictionary with all parameters
+    # Final dictionary
     return {
         "SBCAPE": safe_float(sbcape),
         "SBCIN": safe_float(sbcin),
@@ -328,7 +346,7 @@ def analyze(df):
         "SHOWALTER": safe_float(mpcalc.showalter_index(p, T, Td)),
         "LIFTED_INDEX": safe_float(mpcalc.lifted_index(p, T, Td)),
         "EHI": ehi,
-        "SHIP": safe_float(mpcalc.significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], safe_float(lr_700_500))),
+        "SHIP": significant_hail(mlcape, mpcalc.freezing_level(z, T), T[p.argmin()], safe_float(lr_700_500)),
         "STP": safe_float(mpcalc.significant_tornado(sbcape, sbcin, safe_float(lcl_z), mpcalc.bulk_shear(p, u, v, height=z, depth=6*units.km))),
         "SCP": safe_float(mpcalc.supercell_composite(mucape, safe_float(rm_speed), srh_eff)),
         "RM_SPEED": safe_float(mpcalc.wind_speed(u, v))
