@@ -1,13 +1,8 @@
 streamlit
-shapely
 requests
 pandas
 numpy
+matplotlib
 metpy
 siphon
-matplotlib
-plyer
-sounderpy
-streamlit-folium
-folium
-test
+shapely
