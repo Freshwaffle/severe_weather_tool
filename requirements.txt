@@ -2,8 +2,6 @@ streamlit
 requests
 pandas
 numpy
-matplotlib
-metpy
-siphon
+folium
+streamlit-folium
 shapely
-cartopy
