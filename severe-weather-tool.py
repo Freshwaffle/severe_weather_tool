@@ -1,51 +1,39 @@
-import streamlit as st
 import requests
-import json
-import matplotlib.pyplot as plt
+import folium
+import streamlit as st
+from streamlit_folium import st_folium
 
-
-@st.cache_data(ttl=1800)
-def get_spc_day1_cat():
-    url = "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.lyr.geojson"
-    r = requests.get(url)
+@st.cache_data(ttl=900)
+def fetch_spc_day1_cat():
+    url = "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.geojson"
+    r = requests.get(url, timeout=10)
     r.raise_for_status()
     return r.json()
 
+def build_spc_map(geojson):
+    m = folium.Map(location=[39, -98], zoom_start=4, tiles="cartodbpositron")
 
+    folium.GeoJson(
+        geojson,
+        name="SPC Day 1 Categorical Outlook",
+        style_function=lambda f: {
+            "fillColor": "none",
+            "color": "red",
+            "weight": 2,
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=["risk"],
+            aliases=["Risk:"],
+        ),
+    ).add_to(m)
 
-def plot_spc_outlook(geojson):
-    fig, ax = plt.subplots(figsize=(10, 6))
+    folium.LayerControl().add_to(m)
+    return m
 
-    for feature in geojson["features"]:
-        coords = feature["geometry"]["coordinates"]
+st.set_page_config(layout="wide")
+st.title("Severe Weather Forecast Tool")
 
-        if feature["geometry"]["type"] == "Polygon":
-            for ring in coords:
-                xs = [pt[0] for pt in ring]
-                ys = [pt[1] for pt in ring]
-                ax.plot(xs, ys)
+geojson = fetch_spc_day1_cat()
+m = build_spc_map(geojson)
 
-        elif feature["geometry"]["type"] == "MultiPolygon":
-            for poly in coords:
-                for ring in poly:
-                    xs = [pt[0] for pt in ring]
-                    ys = [pt[1] for pt in ring]
-                    ax.plot(xs, ys)
-
-    ax.set_title("SPC Day 1 Categorical Outlook")
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
-    ax.grid(True)
-
-    return fig
-
-
-
-st.subheader("🟨 SPC Day 1 Convective Outlook")
-
-try:
-    geojson = get_spc_day1_cat()
-    fig = plot_spc_outlook(geojson)
-    st.pyplot(fig)
-except Exception as e:
-    st.error(f"SPC load failed: {e}")
+st_folium(m, width=1000, height=600)
