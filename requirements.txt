@@ -6,3 +6,4 @@ matplotlib
 metpy
 siphon
 shapely
+cartopy
